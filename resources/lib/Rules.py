@@ -28,7 +28,7 @@ from Playlist import PlaylistItem
 
 class RulesList:
     def __init__(self):
-        self.ruleList = [BaseRule(), ScheduleChannelRule(), HandleChannelLogo(), NoShowRule(), DontAddChannel(), EvenShowsRule(), ForceRandom(), ForceRealTime(), ForceResume(), InterleaveChannel(), OnlyUnWatchedRule(), OnlyWatchedRule(), AlwaysPause(), PlayShowInOrder(), RenameRule(), SetResetTime()]
+        self.ruleList = [BaseRule(), ScheduleChannelRule(), HandleChannelLogo(), NoShowRule(), DontAddChannel(), EvenShowsRule(), ForceRandom(), ForceRealTime(), ForceResume(), InterleaveChannel(), OnlyUnWatchedRule(), OnlyWatchedRule(), AlwaysPause(), PlayShowInOrder(), RenameRule(), SetResetTime(), HandleChannelPosition()]
 
 
     def getRuleCount(self):
@@ -1516,3 +1516,54 @@ class EvenShowsRule(BaseRule):
 
         return ''
 
+class HandleChannelPosition(BaseRule):
+    def __init__(self):
+        self.name = "Channel Logo Position"
+        self.optionLabels = "Set Channel Logo Position"
+        self.optionValues = [LANGUAGE(30117)] 
+        self.myId = 18
+        self.actions = [RULES_ACTION_OVERLAY_SET_CHANNELBUG, RULES_ACTION_OVERLAY_SET_CHANNELBUG_END, CHANNELBUG_POS_MAPPING]
+        self.selectBoxOptions = [LANGUAGE(30117), LANGUAGE(30118), LANGUAGE(30119), LANGUAGE(30120), LANGUAGE(30231), LANGUAGE(30232), LANGUAGE(30233), LANGUAGE(30234)]
+        self.channelBugRulesPosition = CHANNELBUG_POS_MAPPING  # use CHANNELBUG_POS_MAPPING here
+        self.selectedOption = None
+
+    def copy(self):
+        return HandleChannelPosition()
+
+    def getTitle(self):
+        if self.optionValues[0] == LANGUAGE(30117):
+            return LANGUAGE(30117)
+        elif self.optionValues[0] == LANGUAGE(30118):
+            return LANGUAGE(30118)
+        elif self.optionValues[0] == LANGUAGE(30119):
+            return LANGUAGE(30119)
+        elif self.optionValues[0] == LANGUAGE(30120):
+            return LANGUAGE(30120)
+        elif self.optionValues[0] == LANGUAGE(30231):
+            return LANGUAGE(30231)
+        elif self.optionValues[0] == LANGUAGE(30232):
+            return LANGUAGE(30232)
+        elif self.optionValues[0] == LANGUAGE(30233):
+            return LANGUAGE(30233)
+        elif self.optionValues[0] == LANGUAGE(30234):
+            return LANGUAGE(30234)
+        else:
+            return self.name
+
+    def onAction(self, action, optionindex):
+        self.selectedOption = self.optionValues[optionindex]
+        self.onActionSelectBox2(action, optionindex)
+        
+    def runAction(self, actionid, overlay, channeldata):
+        self.storedPositionValue = overlay.channelBugPosition
+        if actionid == RULES_ACTION_OVERLAY_SET_CHANNELBUG:
+            selected_option = self.selectedOption
+            if selected_option in self.channelBugRulesPosition:
+                position = self.channelBugRulesPosition[selected_option]
+                overlay.channelBugPosition = position  # set overlay.channelBugPosition here
+                self.log("Set channel position to " + str(position))
+        elif actionid == RULES_ACTION_OVERLAY_SET_CHANNELBUG_END:
+            overlay.channelBugPosition = self.storedPositionValue
+            self.log("Set channel position to " + str(overlay.channelBugPosition))
+
+        return channeldata

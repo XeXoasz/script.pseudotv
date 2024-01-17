@@ -35,6 +35,7 @@ from ChannelList import ChannelList
 from ChannelListThread import ChannelListThread
 from FileAccess import FileLock, FileAccess
 from Migrate import Migrate
+from Rules import HandleChannelPosition
 try:
     from PIL import Image, ImageEnhance
 except:
@@ -545,6 +546,7 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
 
         self.previousChannel = self.currentChannel
         self.currentChannel = channel
+        
         # now load the proper channel playlist
         xbmc.PlayList(xbmc.PLAYLIST_MUSIC).clear()
         self.log("about to load")
@@ -841,6 +843,12 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         self.startNotificationTimer()
 
     def setChannelBug(self):
+        handleChannelPosition = HandleChannelPosition()
+
+         # Run the RULES_ACTION_OVERLAY_SET_CHANNELBUG action
+        channeldata = (self.currentChannel - 1, self.channels[self.currentChannel - 1])
+        handleChannelPosition.runAction(RULES_ACTION_OVERLAY_SET_CHANNELBUG, self, channeldata)
+
         posx = self.channelBugPosition[0]
         posy = self.channelBugPosition[1]
 
@@ -873,6 +881,8 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         else:
             self.getControl(103).setImage('')
 
+             # Run the RULES_ACTION_OVERLAY_SET_CHANNELBUG_END action
+            handleChannelPosition.runAction(RULES_ACTION_OVERLAY_SET_CHANNELBUG_END, self, channeldata)
 
     # Called from the timer to hide the channel label.
     def hideChannelLabel(self):
