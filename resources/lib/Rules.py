@@ -1525,7 +1525,7 @@ class HandleChannelPosition(BaseRule):
         self.actions = [RULES_ACTION_OVERLAY_SET_CHANNELBUG, RULES_ACTION_OVERLAY_SET_CHANNELBUG_END, CHANNELBUG_POS_MAPPING]
         self.selectBoxOptions = [LANGUAGE(30117), LANGUAGE(30118), LANGUAGE(30119), LANGUAGE(30120), LANGUAGE(30231), LANGUAGE(30232), LANGUAGE(30233), LANGUAGE(30234)]
         self.channelBugRulesPosition = CHANNELBUG_POS_MAPPING  # use CHANNELBUG_POS_MAPPING here
-        self.selectedOption = None
+        self.selectedOption = 0
 
     def copy(self):
         return HandleChannelPosition()
