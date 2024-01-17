@@ -134,7 +134,7 @@ class AdvancedConfig(xbmcgui.WindowXMLDialog):
         elif action == ACTION_MOVE_LEFT or action == ACTION_MOVE_RIGHT or action == ACTION_SELECT_ITEM or action == ACTION_SELECT_ITEM2:
             try:
                 if self.getFocusId() == 131:
-                    RuleOptions = ("None", "Best-Effort Channel Scheduling", "Channel Logo", "Don't Include a Show", "Don't Play This Channel", "Even Show Distribution", "Force Random Mode", "Force Real-Time Mode", "Force Resume Mode", "Interleave Another Channel", "Only Play Unwatched Items", "Only Play Watched Items", "Pause When Not Watching", "Play TV Shows In Order", "Set Channel Name", "Reset Every x Days")
+                    RuleOptions = ("None", "Best-Effort Channel Scheduling", "Channel Logo", "Don't Include a Show", "Don't Play This Channel", "Even Show Distribution", "Force Random Mode", "Force Real-Time Mode", "Force Resume Mode", "Interleave Another Channel", "Only Play Unwatched Items", "Only Play Watched Items", "Pause When Not Watching", "Play TV Shows In Order", "Set Channel Name", "Reset Every x Days", "Channel Logo Position")
                     RuleChoice = xbmcgui.Dialog().select("Choose A Rule",RuleOptions)
                     if RuleChoice != -1:
                         self.setRule(RuleChoice)
