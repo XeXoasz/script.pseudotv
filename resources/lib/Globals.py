@@ -100,9 +100,10 @@ MADE_CHAN_LOC = os.path.join(CHANNELS_LOC, 'stored' + '/')
 CHANNELBUG_LOC = xbmc.translatePath(os.path.join(CHANNELS_LOC, 'ChannelBug' + '/'))
 
 CHANNELBUG_POS = [[19,19], [1695,19], [1695,952], [19,952], [250,19], [1483,19], [1483,952], [250,952]]
-CHANNELBUG_POS_LABELS = ["30117", "30118", "30119", "30120", "30231", "30232", "30233", "30234"]
+CHANNELBUG_POS_STRINGS = [30117, 30118, 30119, 30120, 30231, 30232, 30233, 30234]
+CHANNELBUG_POS_LABELS = ["upper left 16:9", "upper right 16:9", "lower right 16:9", "lower left 16:9", "upper left 4:3", "upper right 4:3", "lower right 4:3", "lower left 4:3"]
 
-CHANNELBUG_POS_MAPPING = dict(zip(CHANNELBUG_POS_LABELS, CHANNELBUG_POS))
+CHANNELBUG_POS_MAPPING = dict(zip(CHANNELBUG_POS_LABELS, zip(CHANNELBUG_POS_STRINGS, CHANNELBUG_POS)))
 
 SHORT_CLIP_ENUM = [15, 30, 60, 90, 120, 180, 240, 300, 360]
 INFO_DUR = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
