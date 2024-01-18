@@ -28,7 +28,7 @@ from Playlist import PlaylistItem
 
 class RulesList:
     def __init__(self):
-        self.ruleList = [BaseRule(), ScheduleChannelRule(), HandleChannelLogo(), NoShowRule(), DontAddChannel(), EvenShowsRule(), ForceRandom(), ForceRealTime(), ForceResume(), InterleaveChannel(), OnlyUnWatchedRule(), OnlyWatchedRule(), AlwaysPause(), PlayShowInOrder(), RenameRule(), SetResetTime(), HandleChannelPosition()]
+        self.ruleList = [BaseRule(), ScheduleChannelRule(), HandleChannelLogo(), NoShowRule(), DontAddChannel(), EvenShowsRule(), ForceRandom(), ForceRealTime(), ForceResume(), InterleaveChannel(), OnlyUnWatchedRule(), OnlyWatchedRule(), AlwaysPause(), PlayShowInOrder(), RenameRule(), SetResetTime(), SetChannelBugPosition()]
 
 
     def getRuleCount(self):
@@ -1515,6 +1515,25 @@ class EvenShowsRule(BaseRule):
                         return item
 
         return ''
+
+class SetChannelBugPosition(Rule):  
+
+  def __init__(self):
+    self.name = "Set Channel Bug Position"
+    self.optionLabels = CHANNELBUG_POS_LABELS  
+    self.optionValues = CHANNELBUG_POS
+    self.actions = [RULES_ACTION_OVERLAY_SET_CHANNELBUG]
+
+  
+  def getTitle(self):
+    return "Set Channel Bug Position"
+  
+  def onAction(self, act, optionindex):
+    return optionindex  
+      
+def runAction(self, actionid, channel, channeldata):
+    if actionid == RULES_ACTION_OVERLAY_SET_CHANNELBUG:
+      channel.customChannelBugPosition = self.optionValues[channeldata]
 
 class HandleChannelPosition(BaseRule):
     def __init__(self):
