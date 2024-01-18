@@ -842,15 +842,22 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         self.channelLabelTimer.start()
         self.startNotificationTimer()
 
-    def setChannelBug(self):
-        handleChannelPosition = HandleChannelPosition()
+    def onAction(self, act):
 
-         # Run the RULES_ACTION_OVERLAY_SET_CHANNELBUG action
-        channeldata = (self.currentChannel - 1, self.channels[self.currentChannel - 1])
-        handleChannelPosition.runAction(RULES_ACTION_OVERLAY_SET_CHANNELBUG, self, channeldata)
+  self.actionSemaphore.acquire(False)
 
-        posx = self.channelBugPosition[0]
-        posy = self.channelBugPosition[1]
+  if act == RULES_ACTION_OVERLAY_SET_CHANNELBUG:
+    # Set custom position
+
+  self.actionSemaphore.release()
+
+def setChannelBug(self, channel):
+
+  if hasattr(channel, 'customChannelBugPosition'):
+    # Use custom position
+
+  else:  
+    # Use default position
 
         if self.showChannelBug:
             try:
@@ -880,9 +887,6 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
                self.getControl(103).setPosition(posx, posy)
         else:
             self.getControl(103).setImage('')
-
-             # Run the RULES_ACTION_OVERLAY_SET_CHANNELBUG_END action
-            handleChannelPosition.runAction(RULES_ACTION_OVERLAY_SET_CHANNELBUG_END, self, channeldata)
 
     # Called from the timer to hide the channel label.
     def hideChannelLabel(self):
