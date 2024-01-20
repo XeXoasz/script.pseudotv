@@ -948,3 +948,11 @@ msgstr ""
 msgctxt "#30234"
 msgid "lower left 4:3"
 msgstr ""
+
+msgctxt "#30235"
+msgid "Specific watermark channel positions"
+msgstr ""
+
+msgctxt "#30236"
+msgid "Alternate Channel Watermarks/ ex: 1,2,3"
+msgstr ""
