@@ -388,6 +388,11 @@ class ConfigWindow(xbmcgui.WindowXMLDialog):
         self.updateListing(newchannel)
         self.log("copyChannel return")
 
+    def setChannelCount(self):
+        self.chnlst.quickFlip = False
+        self.chnlst.forceReset = False
+        self.chnlst.findMaxChannels()
+
     def clearChannel(self, curchan):
         self.log("clearChannel channel " + str(curchan))
         ADDON_SETTINGS.setSetting("Channel_" + str(curchan) + "_type", "9999")

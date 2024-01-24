@@ -28,7 +28,7 @@ from Playlist import PlaylistItem
 
 class RulesList:
     def __init__(self):
-        self.ruleList = [BaseRule(), ScheduleChannelRule(), HandleChannelLogo(), NoShowRule(), DontAddChannel(), EvenShowsRule(), ForceRandom(), ForceRealTime(), ForceResume(), InterleaveChannel(), OnlyUnWatchedRule(), OnlyWatchedRule(), AlwaysPause(), PlayShowInOrder(), RenameRule(), SetResetTime()]
+        self.ruleList = [BaseRule(), ScheduleChannelRule(), HandleChannelLogo(), NoShowRule(), DontAddChannel(), EvenShowsRule(), HandleBCT(), ForceRandom(), ForceRealTime(), ForceResume(), InterleaveChannel(), OnlyUnWatchedRule(), OnlyWatchedRule(), AlwaysPause(), PlayShowInOrder(), RenameRule(), SetResetTime()]
 
 
     def getRuleCount(self):
@@ -1141,6 +1141,48 @@ class ForceResume(BaseRule):
         return channeldata
 
 
+
+class HandleBCT(BaseRule):
+    def __init__(self):
+        self.name = LANGUAGE(39998)
+        self.optionLabels = ["Include BCT's"]
+        self.optionValues = ['Yes']
+        self.myId = 17
+        self.actions = RULES_ACTION_START | RULES_ACTION_FINAL_MADE | RULES_ACTION_FINAL_LOADED
+        self.selectBoxOptions = [["Yes", "No"]]
+
+
+    def copy(self):
+        return HandleBCT()
+
+
+    def getTitle(self):
+        if self.optionValues[0] == 'Yes':
+            return "Include BCT"
+        else:
+            return "Exclude BCT"
+
+
+    def onAction(self, act, optionindex):
+        self.onActionSelectBox(act, optionindex)
+        return self.optionValues[optionindex]
+
+
+    def runAction(self, actionid, channelList, channeldata):
+        if actionid == RULES_ACTION_START:
+            self.storedBCTValue = channelList.incBCTs
+            self.log("Option for HandleBCT is " + self.optionValues[0])
+
+            if self.optionValues[0] == 'Yes':
+                channelList.incBCTs = True
+            else:
+                channelList.incBCTs = False
+        elif actionid == RULES_ACTION_FINAL_MADE or actionid == RULES_ACTION_FINAL_LOADED:
+            channelList.incBCTs = self.storedBCTValue
+
+        return channeldata
+    
+    
 
 class ForceRandom(BaseRule):
     def __init__(self):

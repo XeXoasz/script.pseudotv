@@ -23,6 +23,7 @@ import datetime
 import sys, re
 import random
 
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -33,6 +34,8 @@ from Globals import *
 from Channel import Channel
 from VideoParser import VideoParser
 from FileAccess import FileLock, FileAccess
+from pyfscache import *
+from random import randint
 
 class ChannelList:
     def __init__(self):
@@ -50,6 +53,7 @@ class ChannelList:
         self.runningActionId = 0
         self.enteredChannelCount = 0
         self.background = True
+        self.quickflipEnabled = False
         self.AlreadyWarned = False
         self.DirAlreadyWarned = False
         self.FailWarning = False
@@ -63,7 +67,6 @@ class ChannelList:
         self.UseEpisodeTitleHideTitle = []
         self.UseEpisodeTitleHideTitle = []
         self.HideDirectoryTitle = []
-        
         random.seed()
         self.maxNeededChannels = 999
 
@@ -91,7 +94,14 @@ class ChannelList:
         self.UseEpisodeTitleKeepShowTitle = ADDON.getSetting('UseEpisodeTitleKeepShowTitle').split(",")
         self.UseEpisodeTitleHideTitle = ADDON.getSetting('UseEpisodeTitleHideTitle').split(",")
         self.HideDirectoryTitle = ADDON.getSetting('HideDirectoryTitle').split(",")
-           
+        self.incIceLibrary = ADDON.getSetting('IncludeIceLib') == "true"
+        self.log("IceLibrary is " + str(self.incIceLibrary))
+        self.incBCTs = ADDON.getSetting('IncludeBCTs') == "true"
+        self.log("IncludeBCTs is " + str(self.incBCTs))
+        self.includeMeta = ADDON.getSetting('IncludeMeta') == "true"
+        self.log("IncludeMeta is " + str(self.includeMeta))
+        self.quickFlip = REAL_SETTINGS.getSetting('Enable_quickflip') == "true"
+        
         if self.forceReset:
             ADDON.setSetting('ForceChannelReset', "False")
             self.forceReset = False
@@ -161,28 +171,41 @@ class ChannelList:
 
     # Determine the maximum number of channels by opening consecutive
     # playlists until we don't find one
+    # Determine the maximum number of channels by opening consecutive settings until we don't find one.
     def findMaxChannels(self):
         self.log('findMaxChannels')
+        localCount = 0
         self.maxChannels = 0
-        self.enteredChannelCount = 0
+        self.enteredChannelCount = 0      
+        self.freshBuild = False
 
-        for i in range(self.maxNeededChannels):
+        for i in range(CHANNEL_LIMIT):
             chtype = 9999
             chsetting1 = ''
             chsetting2 = ''
-
+            chsetting3 = ''
+            chsetting4 = ''
+            
             try:
                 chtype = int(ADDON_SETTINGS.getSetting('Channel_' + str(i + 1) + '_type'))
                 chsetting1 = ADDON_SETTINGS.getSetting('Channel_' + str(i + 1) + '_1')
                 chsetting2 = ADDON_SETTINGS.getSetting('Channel_' + str(i + 1) + '_2')
-            except:
+                chsetting3 = ADDON_SETTINGS.getSetting('Channel_' + str(i + 1) + '_3')
+                chsetting4 = ADDON_SETTINGS.getSetting('Channel_' + str(i + 1) + '_4')
+            except Exception,e:
                 pass
 
             if chtype == 0:
                 if FileAccess.exists(xbmc.translatePath(chsetting1)):
+                    localCount += 1
                     self.maxChannels = i + 1
                     self.enteredChannelCount += 1
-            elif chtype < 8:
+            elif chtype <= 7:
+                if len(chsetting1) > 0:
+                    localCount += 1
+                    self.maxChannels = i + 1
+                    self.enteredChannelCount += 1
+            elif chtype != 9999:
                 if len(chsetting1) > 0:
                     self.maxChannels = i + 1
                     self.enteredChannelCount += 1
@@ -190,13 +213,25 @@ class ChannelList:
             if self.forceReset and (chtype != 9999):
                 ADDON_SETTINGS.setSetting('Channel_' + str(i + 1) + '_changed', "True")
 
+        #if local quota not met, disable quickFlip.
+        if self.quickFlip == True and localCount > (self.enteredChannelCount/4):
+            self.quickflipEnabled = True
+        
+        if self.maxChannels == 1:
+            REAL_SETTINGS.setSetting("Config","%i channel"%self.enteredChannelCount)
+        else:
+            REAL_SETTINGS.setSetting("Config","%i channels"%self.enteredChannelCount)
+        self.log('findMaxChannels, quickflipEnabled = ' + str(self.quickflipEnabled))
         self.log('findMaxChannels return ' + str(self.maxChannels))
 
-
     def sendJSON(self, command):
-        data = xbmc.executeJSONRPC(command)
-        return unicode(data, 'utf-8', errors='ignore')
-
+        self.log('sendJSON')
+        data = ''
+        try:
+            data = xbmc.executeJSONRPC(uni(command))
+        except UnicodeEncodeError:
+            data = xbmc.executeJSONRPC(ascii(command))
+        return uni(data)
 
     def setupChannel(self, channel, background = False, makenewlist = False, append = False):
         self.log('setupChannel ' + str(channel))
@@ -205,6 +240,8 @@ class ChannelList:
         chtype = 9999
         chsetting1 = ''
         chsetting2 = ''
+        chsetting3 = ''
+        chsetting4 = ''
         needsreset = False
         self.background = background
         self.settingChannel = channel
@@ -213,6 +250,8 @@ class ChannelList:
             chtype = int(ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_type'))
             chsetting1 = ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_1')
             chsetting2 = ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_2')
+            chsetting3 = ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_3')
+            chsetting4 = ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_4')
         except:
             pass
 
@@ -220,20 +259,47 @@ class ChannelList:
             self.channels.append(Channel())
 
         if chtype == 9999:
+            valid = False
+        elif chtype == 0:
+            if FileAccess.exists(xbmc.translatePath(chsetting1)) == True:
+                valid = True
+        elif chtype == 7:
+            if FileAccess.exists(chsetting1) == True:
+                valid = True
+        elif chtype in [8,9]:
+            if self.Valid_ok(chsetting2) == True:
+                valid = True
+        elif chtype == 10:
+            if self.youtube_player != 'False':
+                valid = True
+        elif chtype in [11,15,16]:
+            if self.Valid_ok(chsetting1) == True:
+                valid = True
+        else:
+            if len(chsetting1) > 0:
+                valid = True
+        self.log('setupChannel ' + str(channel) + ', valid = ' + str(valid))
+        
+        if valid == False:
             self.channels[channel - 1].isValid = False
             return False
-
+        
         self.channels[channel - 1].isSetup = True
+        self.channels[channel - 1].isSetup = True
+        self.channels[channel - 1].hasChanged = False
         self.channels[channel - 1].loadRules(channel)
         self.runActions(RULES_ACTION_START, channel, self.channels[channel - 1])
 
         try:
             needsreset = ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_changed') == 'True'
-
-            if needsreset:
-                self.channels[channel - 1].isSetup = False
         except:
-            pass
+            needsreset = False
+
+        if needsreset:
+           self.channels[channel - 1].isSetup = False
+
+        self.log('setupChannel ' + str(channel) + ', needsreset = ' + str(needsreset))
+        self.log('setupChannel ' + str(channel) + ', makenewlist = ' + str(makenewlist))
 
         # If possible, use an existing playlist
         # Don't do this if we're appending an existing channel
@@ -243,54 +309,60 @@ class ChannelList:
                 self.channels[channel - 1].totalTimePlayed = int(ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_time', True))
                 createlist = True
 
-                if self.background == False:
-                    self.updateDialog.update(self.updateDialogProgress, ''.join(LANGUAGE(30166)) % (str(channel)), LANGUAGE(30171), '')
-
                 if self.channels[channel - 1].setPlaylist(CHANNELS_LOC + 'channel_' + str(channel) + '.m3u') == True:
+                    self.setBackgroundStatus("Initializing: Loading Channel " + str(channel),string2='loading playlist')
                     self.channels[channel - 1].isValid = True
                     self.channels[channel - 1].fileName = CHANNELS_LOC + 'channel_' + str(channel) + '.m3u'
+                    timedif = time.time() - self.lastResetTime
                     returnval = True
+                    
+                    if chtype == 8: 
+                        # If this channel has been watched for longer than it lasts, reset the channel
+                        if self.channels[channel - 1].totalTimePlayed < self.channels[channel - 1].getTotalDuration():
+                            createlist = False 
+       
+                        if timedif >= (LIVETV_MAXPARSE - 7200) or self.channels[channel - 1].totalTimePlayed >= (LIVETV_MAXPARSE - 7200):
+                            createlist = True
+                    else: 
+                        if self.channelResetSetting == 0:
+                            # If this channel has been watched for longer than it lasts, reset the channel
+                            if self.channels[channel - 1].totalTimePlayed < self.channels[channel - 1].getTotalDuration():
+                                createlist = False
 
-                    # If this channel has been watched for longer than it lasts, reset the channel
-                    if self.channelResetSetting == 0 and self.channels[channel - 1].totalTimePlayed < self.channels[channel - 1].getTotalDuration():
-                        createlist = False
+                        if self.channelResetSetting > 0 and self.channelResetSetting < 4:
+                        
+                            if self.channelResetSetting == 1 and timedif < (60 * 60 * 24):
+                                createlist = False
 
-                    if self.channelResetSetting > 0 and self.channelResetSetting < 4:
-                        timedif = time.time() - self.lastResetTime
+                            if self.channelResetSetting == 2 and timedif < (60 * 60 * 24 * 7):
+                                createlist = False
 
-                        if self.channelResetSetting == 1 and timedif < (60 * 60 * 24):
+                            if self.channelResetSetting == 3 and timedif < (60 * 60 * 24 * 30):
+                                createlist = False
+
+                            if timedif < 0:
+                                createlist = False
+
+                        if self.channelResetSetting == 4:
                             createlist = False
-
-                        if self.channelResetSetting == 2 and timedif < (60 * 60 * 24 * 7):
-                            createlist = False
-
-                        if self.channelResetSetting == 3 and timedif < (60 * 60 * 24 * 30):
-                            createlist = False
-
-                        if timedif < 0:
-                            createlist = False
-
-                    if self.channelResetSetting == 4:
-                        createlist = False
-            except:
-                pass
+            except Exception,e:
+                self.log('setupChannel ' + str(channel) + ', _time failed! ' + str(e))                
 
         if createlist or needsreset:
+            # self.clearFileListCache(chtype, channel)
             self.channels[channel - 1].isValid = False
-
             if makenewlist:
                 try:
-                    os.remove(CHANNELS_LOC + 'channel_' + str(channel) + '.m3u')
+                    FileAccess.delete(CHANNELS_LOC + 'channel_' + str(channel) + '.m3u')
                 except:
-                    pass
-
+                    self.log("Unable to delete " + 'channel_' + str(channel) + '.m3u', xbmc.LOGERROR)
                 append = False
 
                 if createlist:
                     ADDON_SETTINGS.setSetting('LastResetTime', str(int(time.time())))
 
         if append == False:
-            if chtype == 6 and chsetting2 == str(MODE_ORDERAIRDATE):
+            if chtype in [0,1,3,5,6] and chsetting2 == str(MODE_ORDERAIRDATE):
                 self.channels[channel - 1].mode = MODE_ORDERAIRDATE
 
             # if there is no start mode in the channel mode flags, set it to the default
@@ -302,34 +374,38 @@ class ChannelList:
                 elif self.startMode == 2:
                     self.channels[channel - 1].mode |= MODE_RANDOM
 
-        if ((createlist or needsreset) and makenewlist) or append:
-            if self.background == False:
-                self.updateDialogProgress = (channel - 1) * 100 // self.enteredChannelCount
-                self.updateDialog.update(self.updateDialogProgress, ''.join(LANGUAGE(30168)) % (str(channel)), LANGUAGE(30172), '')
 
-            if self.makeChannelList(channel, chtype, chsetting1, chsetting2, append) == True:
+        if ((createlist or needsreset) and makenewlist) or append:
+            self.log('setupChannel, Updating Channel ' + str(channel))
+            
+            if self.makeChannelList(channel, chtype, chsetting1, chsetting2, chsetting3, chsetting4, append) == True:
                 if self.channels[channel - 1].setPlaylist(CHANNELS_LOC + 'channel_' + str(channel) + '.m3u') == True:
                     returnval = True
+                    self.updateDialogProgress = (channel - 1) // self.enteredChannelCount
+                    self.setBackgroundStatus("Initializing: Loading Channel " + str(channel),inc=self.updateDialogProgress,string2='reading playlist')
                     self.channels[channel - 1].fileName = CHANNELS_LOC + 'channel_' + str(channel) + '.m3u'
                     self.channels[channel - 1].isValid = True
-
+                    
                     # Don't reset variables on an appending channel
                     if append == False:
                         self.channels[channel - 1].totalTimePlayed = 0
                         ADDON_SETTINGS.setSetting('Channel_' + str(channel) + '_time', '0')
 
-                        if needsreset:
+                        if needsreset and self.channels[channel - 1].hasChanged == False:
                             ADDON_SETTINGS.setSetting('Channel_' + str(channel) + '_changed', 'False')
                             self.channels[channel - 1].isSetup = True
 
+        if self.channels[channel - 1].hasChanged == True:
+            ADDON_SETTINGS.setSetting('Channel_' + str(channel) + '_changed', 'True')                    
+
         self.runActions(RULES_ACTION_BEFORE_CLEAR, channel, self.channels[channel - 1])
 
-        # Don't clear history when appending channels
-        if self.background == False and append == False and self.myOverlay.isMaster:
-            self.updateDialogProgress = (channel - 1) * 100 // self.enteredChannelCount
-            self.updateDialog.update(self.updateDialogProgress, ''.join(LANGUAGE(30166)) % (str(channel)), LANGUAGE(30173), '')
+        # Don't clear history when appending channels            
+        if append == False and self.myOverlay.isMaster:
             self.clearPlaylistHistory(channel)
-
+            self.updateDialogProgress = (channel - 1) // self.enteredChannelCount
+            self.setBackgroundStatus("Initializing: Loading Channel " + str(channel),inc=self.updateDialogProgress,string2='clearing playlist')
+            
         if append == False:
             self.runActions(RULES_ACTION_BEFORE_TIME, channel, self.channels[channel - 1])
 
@@ -351,13 +427,13 @@ class ChannelList:
                 self.channels[channel - 1].showTimeOffset -= self.channels[channel - 1].getCurrentDuration()
                 self.channels[channel - 1].addShowPosition(1)
 
-        self.channels[channel - 1].name = self.getChannelName(chtype, chsetting1)
-        
         if ((createlist or needsreset) and makenewlist) and returnval:
             self.runActions(RULES_ACTION_FINAL_MADE, channel, self.channels[channel - 1])
         else:
             self.runActions(RULES_ACTION_FINAL_LOADED, channel, self.channels[channel - 1])
-
+            
+        self.log('setupChannel ' + str(channel) + ', append = ' + str(append))
+        self.log('setupChannel ' + str(channel) + ', createlist = ' + str(createlist))
         return returnval
 
 
@@ -458,12 +534,18 @@ class ChannelList:
     
     # Based on a smart playlist, create a normal playlist that can actually be used by us
     def makeChannelList(self, channel, chtype, setting1, setting2, append = False):
-        self.log('makeChannelList ' + str(channel))
+        self.log('makeChannelList, CHANNEL: ' + str(channel))
+        # self.getFileListCache(chtype, channel)
+        msg = 'default' 
+        fileListCHK = False
         israndom = False
+        isreverse = False
+        bctType = None
         fileList = []
+        limit = MEDIA_LIMIT #Global
 
         if chtype == 7:
-            fileList = self.createDirectoryPlaylist(setting1, channel)
+            fileList = self.createDirectoryPlaylist(setting1, channel, limit)
             israndom = True
         else:
             if chtype == 0:
@@ -498,9 +580,23 @@ class ChannelList:
             xml.close()
 
             if self.getSmartPlaylistType(dom) == 'mixed':
+                bctType = 'mixed'
                 fileList = self.buildMixedFileList(dom, channel)
+
+            elif self.getSmartPlaylistType(dom) == 'movies':
+                bctType = 'movies'
+                fileList = self.buildFileList(fle, channel, limit, 'video')
+            
+            elif self.getSmartPlaylistType(dom) in ['episodes','tvshow']:
+                bctType = 'episodes'
+                fileList = self.buildFileList(fle, channel, limit, 'video')
+                
+            elif self.getSmartPlaylistType(dom) in ['songs','albums','artists']:
+                fileList = self.buildFileList(fle, channel, limit, 'music')
+                
             else:
-                fileList = self.buildFileList(fle, channel, chtype)
+                fileList = self.buildFileList(fle, channel, limit, 'video')
+           
             try:
                 order = dom.getElementsByTagName('order')
 
@@ -525,24 +621,40 @@ class ChannelList:
 
         if israndom:
             random.shuffle(fileList)
+            msg = 'random' 
+        elif isreverse:
+            fileList.reverse()
+            msg = 'reverse'
+        self.log("makeChannelList, Using Media Sort " + msg)
+        self.channels[channel - 1].isRandom = israndom
+        self.channels[channel - 1].isReverse = isreverse    
 
-        if len(fileList) > 16384:
-            fileList = fileList[:16384]
+        if len(fileList) > self.Playlist_Limit:
+            fileList = fileList[:self.Playlist_Limit]
 
         fileList = self.runActions(RULES_ACTION_LIST, channel, fileList)
-        self.channels[channel - 1].isRandom = israndom
+        
+        # inject BCT into filelist
+        if self.incBCTs == True and bctType != None:
+            fileList = self.insertBCT(chtype, channel, fileList, bctType)
 
         if append:
-            if len(fileList) + self.channels[channel - 1].Playlist.size() > 16384:
-                fileList = fileList[:(16384 - self.channels[channel - 1].Playlist.size())]
+            if len(fileList) + self.channels[channel - 1].Playlist.size() > self.Playlist_Limit:
+                fileList = fileList[:(self.Playlist_Limit - self.channels[channel - 1].Playlist.size())]
         else:
-            if len(fileList) > 16384:
-                fileList = fileList[:16384]
+            if len(fileList) > self.Playlist_Limit:
+
+                fileList = fileList[:self.Playlist_Limit]
+                        
+        if len(fileList) == 0:
+            self.channels[channel - 1].isValid = False
 
         # Write each entry into the new playlist
         for string in fileList:
             channelplaylist.write(uni("#EXTINF:") + uni(string) + uni("\n"))
-
+         
+        # cleanup   
+        del fileList[:]
         channelplaylist.close()
         self.log('makeChannelList return')
         return True
@@ -710,82 +822,43 @@ class ChannelList:
         return flename
 
 
-    def createDirectoryPlaylist(self, setting1, channel):
+    def createDirectoryPlaylist(self, setting1, setting3, setting4, channel):
         self.log("createDirectoryPlaylist " + setting1)
         fileList = []
+        LocalLST = []
+        LocalFLE = ''
         filecount = 0
-        chsetting3 = ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_3')
 
-        def listdir_fullpath(dir):
-            return [uni(os.path.join(dir, f)) for f in xbmcvfs.listdir(dir)[1]]
+        if not setting1.endswith('/'):
+            setting1 = os.path.join(setting1,'')
+        LocalLST = self.walk(setting1)
 
-        if self.background == False:
-            self.updateDialog.update(self.updateDialogProgress, ''.join(LANGUAGE(30168)) % (str(self.settingChannel)), LANGUAGE(30172), LANGUAGE(30174))
-
-        file_detail = listdir_fullpath(setting1)
-        
-        debug('file_detail = ', file_detail)
-
-        for f in file_detail:
+        for i in range(len(LocalLST)):         
             if self.threadPause() == False:
                 del fileList[:]
                 break
+        
+            LocalFLE = (LocalLST[i])
+            duration = self.getDuration(LocalFLE)
 
-            duration = self.videoParser.getVideoLength(f)
-
-            if duration == 0:
-                self.log("Failed to find duration for directory video " + str(f), xbmc.LOGWARNING)
-                if self.DirFailWarning:
-                    if self.DirAlreadyWarned == False:
-                        assetMsg = "Possible Failure Adding Directory Video.  Check log."
-                        xbmc.executebuiltin('Notification(%s, %s, %d, %s)' % ("PseudoTV BuildFileList", assetMsg, NOTIFICATION_DISPLAY_TIME * 500, ICON))
-                        self.AlreadyWarned = True
-                if self.DirAssignDuration:
-                    self.log("Setting default duration for " + str(f), xbmc.LOGWARNING)
-                    duration = self.DirAssignedDuration
-            
             if duration > 0:
-                filecount += 1
-
-                if self.background == False:
-                    if filecount == 1:
-                        self.updateDialog.update(self.updateDialogProgress, ''.join(LANGUAGE(30168)) % (str(self.settingChannel)), LANGUAGE(30172), ''.join(LANGUAGE(30175)) % (str(filecount)))
-                    else:
-                        self.updateDialog.update(self.updateDialogProgress, ''.join(LANGUAGE(30168)) % (str(self.settingChannel)), LANGUAGE(30172), ''.join(LANGUAGE(30176)) % (str(filecount)))
-
-                afile = os.path.basename(f)
-                afile, ext = os.path.splitext(afile)
-                tmpstr = str(duration) + ','
+               filecount += 1
+               self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding %s Videos" % str(filecount),inc=int(((filecount) // channel) // self.enteredChannelCount))
+               title = (os.path.split(LocalFLE)[1])
+               title = os.path.splitext(title)[0].replace('.', ' ')
+               description = LocalFLE.replace('//','/').replace('/','\\')
+               GenreLiveID = ['Unknown', 'other', 0, 0, False, 1, 'NR', False, False, 0.0, 0]
+               tmpstr = self.makeTMPSTR(duration, title, 0, 'Directory Video', description, GenreLiveID, LocalFLE)
+               fileList.append(tmpstr)
                 
-                if chsetting3:
-                    NewPlots = chsetting3.replace('==e==',afile)
-                    NewPlotList = NewPlots.split('|')
-                    maxPlot = len(NewPlotList) - 1
-                    randPlot = random.randint(0, maxPlot)
-                    if str(channel) in self.HideDirectoryTitle:
-                        afile = ""
-                    
-                    
-                    tmpstr += afile + "//" + "//" + NewPlotList[randPlot] + "\n"
-                    
-                else:
-                    ChannelName = ''    
-                    if setting1[-1] == '/' or setting1[-1] == '\\':
-                        ChannelName = os.path.split(setting1[:-1])[1]
-                    if str(channel) in self.HideDirectoryTitle:
-                        afile = ""
-                    tmpstr += afile + "//" + "//" + LANGUAGE(30049) + (' "{}"'.format(setting1)) + "\n"
-                    #tmpstr += afile + "//" + "//" + LANGUAGE(30193) + ChannelName + LANGUAGE(30194) + afile  + ".\n"
-                    self.log('ChannelName = ' + str(ChannelName))
-                
-                tmpstr += setting1 + os.path.basename(f)
-                tmpstr = uni(tmpstr[:2036])
-                fileList.append(tmpstr)
-            
-           
+               if filecount >= channel:
+                   break
+
         if filecount == 0:
             self.log('Unable to access Videos files in ' + setting1)
-
+        
+        # cleanup   
+        del LocalLST[:]
         return fileList
 
 
@@ -1348,3 +1421,442 @@ class ChannelList:
         except:
             self.log("Unable to get the playlist type.", xbmc.LOGERROR)
             return ''
+
+    def insertBCT(self, chtype, channel, fileList, type):
+        self.log("insertBCT, channel = " + str(channel))
+        newFileList = []
+        try:
+            chname = self.getChannelName(chtype, channel, ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_1'))
+            #Bumpers & Ratings
+            BumperLST = []
+            BumpersType = REAL_SETTINGS.getSetting("bumpers")      
+            if BumpersType != "0" and type != 'movies': 
+                BumperLST = self.getBumperList(BumpersType, chname)
+
+                if REAL_SETTINGS.getSetting('bumperratings') == 'true':
+                    fileList = self.getRatingList(chtype, chname, channel, fileList)
+
+                # #3D, insert "put glasses on" for 3D and use 3D ratings if enabled. todo
+                # if BumpersType!= "0" and type == 'movies' and REAL_SETTINGS.getSetting('bumper3d') == 'true':
+                    # fileList = self.get3DList(chtype, chname, channel, fileList)
+                    
+            #Commercial
+            CommercialLST = []
+            CommercialsType = REAL_SETTINGS.getSetting("commercials") 
+            if CommercialsType != '0' and type != 'movies':
+                CommercialLST = self.getCommercialList(CommercialsType, chname)
+
+            #Trailers
+            try:
+                if type == 'movies' and REAL_SETTINGS.getSetting('Movietrailers') == 'false':
+                    raise Exception()
+                    
+                TrailerLST = []
+                TrailersType = REAL_SETTINGS.getSetting("trailers")
+                if TrailersType != '0':
+                    TrailerLST = self.getTrailerList(chtype, chname)
+            except:
+                pass
+
+            # Inject BCTs into filelist          
+            for i in range(len(fileList)):
+                newFileList.append(fileList[i])
+                if len(BumperLST) > 0:  
+                    random.shuffle(BumperLST)              
+                    for n in range(int(REAL_SETTINGS.getSetting("numbumpers")) + 1):
+                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Bumpers")
+                        newFileList.append(random.choice(BumperLST))#random fill
+
+                if len(CommercialLST) > 0:
+                    random.shuffle(CommercialLST)                
+                    for n in range(int(REAL_SETTINGS.getSetting("numcommercials")) + 1):
+                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Commercials")
+                        newFileList.append(random.choice(CommercialLST))#random fill
+                        
+                if len(TrailerLST) > 0:
+                    random.shuffle(TrailerLST)                
+                    for n in range(int(REAL_SETTINGS.getSetting("numtrailers")) + 1):
+                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Trailers")
+                        newFileList.append(random.choice(TrailerLST))#random fill
+    #random.shuffle(newFileList)
+                
+            # cleanup   
+            del fileList[:]
+            del BumperLST[:]
+            del CommercialLST[:]
+            del TrailerLST[:]
+            return newFileList
+        except:
+            del newFileList[:]
+            return fileList
+        
+        
+    def getBumperList(self, BumpersType, chname):
+        self.log("getBumperList")
+        BumperLST = []
+        BumperTMPstrLST = []
+        
+        #Local
+        if BumpersType == "1":  
+            self.log("getBumperList, Local - " + chname)
+            PATH = xbmc.translatePath(os.path.join(REAL_SETTINGS.getSetting('bumpersfolder'),chname,''))
+            self.log("getBumperList, Local - PATH = " + PATH)
+            BumperLST.extend(self.createDirectoryPlaylist(PATH, 100, 1, 100)) 
+        #Internet
+        elif BumpersType == "2":
+            self.log("getBumperList - Internet - " + chname)
+            Bumper_List = 'http://raw.github.com/PseudoTV/PseudoTV_Lists/master/bumpers.ini'
+            linesLST = read_url_cached(Bumper_List, return_type='readlines')
+            for i in range(len(Bumper_List)): 
+                self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="querying %i Internet Bumpers"%i)                    
+                try:                 
+                    ChannelName,BumperNumber,BumperSourceID = (str(linesLST[i]).replace('\n','').replace('\r','').replace('\t','')).split('|')
+                    BumperSource,BumperID = BumperSourceID.split('_')
+                    
+                    if chname.lower() == ChannelName.lower():
+                        if BumperSource.lower() == 'vimeo':
+                            if self.vimeo_player != 'False':
+                                GenreLiveID = ['Bumper', 'bct', 0, 0 , False, 1, 'NR', False, False, 0.0, 0]
+                                BumperTMPstrLST.append(self.makeTMPSTR(self.getVimeoMeta(BumperID)[2], chname, 0, 'Bumper', 'Bumper', GenreLiveID, self.vimeo_player + BumperID))
+                                
+                        elif BumperSource.lower() == 'youtube':
+                            if self.youtube_player != 'False':           
+                                GenreLiveID = ['Bumper', 'bct', 0, 0 , False, 1, 'NR', False, False, 0.0, 0]
+                                BumperTMPstrLST.append(self.makeTMPSTR(self.getYoutubeDuration(BumperID), chname, 0, 'Bumper', 'Bumper', GenreLiveID, self.youtube_player + BumperID, includeMeta=False))        
+                except: 
+                    pass
+            BumperLST.extend(BumperTMPstrLST)      
+        # cleanup   
+        del BumperTMPstrLST[:]
+        return random.shuffle(BumperLST)    
+    
+
+    def getRatingList(self, chtype, chname, channel, fileList, ddd=False):
+        self.log("getRatingList")
+        newFileList = []
+        Ratings = (['NR','qlRaA8tAfc0'],['R','s0UuXOKjH-w'],['NC-17','Cp40pL0OaiY'],['PG-13','lSg2vT5qQAQ'],['PG','oKrzhhKowlY'],['G','QTKEIFyT4tk'],['18','g6GjgxMtaLA'],['16','zhB_xhL_BXk'],['12','o7_AGpPMHIs'],['6','XAlKSm8D76M'],['0','_YTMglW0yk'])
+        Ratings_3D = [] # todo 3d ratings
+                       
+        if self.youtube_player != 'False': 
+            for i in range(len(fileList)):
+                if self.threadPause() == False:
+                    del newFileList[:]
+                    break  
+                try:
+                    newFileList.append(fileList[i])
+                    lineLST = (fileList[i]).split('movie|')[1]
+                    mpaa = (lineLST.split('\n')[0]).split('|')[4]
+                    self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Ratings: " + str(mpaa))
+                    
+                    for i in range(len(Ratings)):
+                        ID = 'qlRaA8tAfc0'
+                        rating = Ratings[i]        
+                        if mpaa.lower() == rating[0].lower():
+                            ID = rating[1]
+                            break
+
+                    GenreLiveID = ['Rating', 'bct', 0, 0, False, 1, mpaa, False, False, 0.0, 0]
+                    newFileList.append(self.makeTMPSTR(self.getYoutubeDuration(ID), chname, 0, 'Rating', 'Rating', GenreLiveID, self.youtube_player + ID, includeMeta=False))
+                except:
+                    pass
+            # cleanup   
+            del fileList[:]
+            return newFileList
+        else:
+            return fileList
+        
+    
+    def getCommercialList(self, CommercialsType, chname):  
+        self.log("getCommercialList") 
+        CommercialLST = []       
+
+        #Local
+        if CommercialsType == '1':
+            self.log("getCommercialList, Local - " + chname)
+            PATH = xbmc.translatePath(os.path.join(PATH,''))
+            self.log("getCommercialList, Local - PATH = " + PATH)
+            CommercialLST.extend(self.createDirectoryPlaylist(PATH, 100, 1, 100)) 
+                    
+        #Youtube
+        elif CommercialsType == '2':   
+            #Youtube - As Seen On TV
+            if REAL_SETTINGS.getSetting('AsSeenOn') == 'true':
+                self.log("getCommercialList, AsSeenOn") 
+                CommercialLST.extend(self.createYoutubeFilelist('PL_ikfJ-FJg77ioZ9nPuhJxuMe9GKu7plT|PL_ikfJ-FJg774gky7eu8DroAqCR_COS79|PL_ikfJ-FJg75N3Gn6DjL0ZArAcfcGigLY|PL_ikfJ-FJg765O5ppOPGTpQht1LwXmck4|PL_ikfJ-FJg75wIMSXOTdq0oMKm63ucQ_H|PL_ikfJ-FJg77yht1Z6Xembod33QKUtI2Y|PL_ikfJ-FJg77PW8AJ3yk5HboSwWatCg5Z|PL_ikfJ-FJg75v4dTW6P0m4cwEE4-Oae-3|PL_ikfJ-FJg76zae4z0TX2K4i_l5Gg-Flp|PL_ikfJ-FJg74_gFvBqCfDk2E0YN8SsGS8|PL_ikfJ-FJg758W7GVeTVZ4aBAcCBda63J', '7', '200', '1', '200'))
+            self.log("getCommercialList, Youtube") 
+            CommercialLST.extend(self.createYoutubeFilelist(REAL_SETTINGS.getSetting('commercialschannel'), '2', '200', '2', '200'))
+        
+        #Internet
+        elif CommercialsType == '3':
+            self.log("getCommercialList, Internet") 
+            CommercialLST.extend(self.InternetCommercial())
+        return random.shuffle(CommercialLST) 
+   
+        
+    def InternetCommercial(self):
+        self.log("InternetCommercial")
+        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Internet Commercials")     
+        CommercialLST = []
+        #todo add plugin parsing...
+        if len(CommercialLST) > 0:
+            random.shuffle(CommercialLST)
+        return CommercialLST       
+
+    
+    def getTrailerList(self, chtype, chname):
+        self.log("getTrailerList")
+        TrailerLST = [] 
+        TrailerTMPstrLST = []
+        GenreChtype = False
+        if chtype == '3' or chtype == '4' or chtype == '5':
+            GenreChtype = True
+
+        #Local
+        if TrailersType == '1': 
+            PATH = xbmc.translatePath(os.path.join(REAL_SETTINGS.getSetting('trailersfolder'),''))
+            self.log("getTrailerList, Local - PATH = " + PATH)
+            
+            if FileAccess.exists(PATH):
+                LocalFLE = ''
+                LocalTrailer = ''
+                LocalLST = self.walk(PATH)        
+                for i in range(len(LocalLST)): 
+                    try:   
+                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Local Trailers")
+                        LocalFLE = LocalLST[i]
+                        if '-trailer' in LocalFLE:
+                            duration = self.getDuration(LocalFLE)
+                            if duration > 0:
+                                GenreLiveID = ['Trailer', 'bct', 0, 0, False, 1, 'NR', False, False, 0.0, 0]
+                                TrailerTMPstrLST.append(self.makeTMPSTR(duration, chname, 0, 'Trailer', 'Trailer', GenreLiveID, LocalFLE, includeMeta=False))   
+                        TrailerLST.extend(TrailerTMPstrLST)                                
+                    except Exception,e:
+                        self.log("getTrailerList failed! " + str(e), xbmc.LOGERROR)
+
+        #Kodi Library
+        # if TrailersType == '2':
+            # self.log("getTrailerList, Kodi Library")
+            # json_query = ('{"jsonrpc":"2.0","method":"VideoLibrary.GetMovies","params":{"properties":["genre","trailer","runtime"]}, "id": 1}')
+            # json_detail = self.sendJSON(json_query)
+            
+            # if REAL_SETTINGS.getSetting('trailersgenre') == 'true' and GenreChtype == True:
+                # JsonLST = ascii(json_detail.split("},{"))
+                # match = [s for s in JsonLST if chname in s]
+                
+                # for i in range(len(match)):    
+                    # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Library Genre Trailers")
+                    # duration = 120
+                    # json = (match[i])
+                    # trailer = json.split(',"trailer":"',1)[-1]
+                    # if ')"' in trailer:
+                        # trailer = trailer.split(')"')[0]
+                    # else:
+                        # trailer = trailer[:-1]
+                    
+                    # if trailer != '' or trailer != None or trailer != '"}]}':
+                        # if 'http://www.youtube.com/watch?hd=1&v=' in trailer:
+                            # trailer = trailer.replace("http://www.youtube.com/watch?hd=1&v=", self.youtube_player).replace("http://www.youtube.com/watch?v=", self.youtube_player)
+                        # JsonTrailer = (str(duration) + ',' + trailer)
+                        # if JsonTrailer != '120,':
+                            # JsonTrailerLST.append(JsonTrailer)
+                # TrailerLST.extend(JsonTrailerLST)
+            
+            # if self.youtube_player != 'False':
+
+                # try:
+                    # self.log('getTrailerList, json_detail using cache')
+
+
+                    # else:
+                        # JsonLST = (json_detail.split("},{"))
+                        # match = [s for s in JsonLST if 'trailer' in s]
+                        # for i in range(len(match)):                  
+                            # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Library Trailers")
+                            # duration = 120
+                            # json = (match[i])
+                            # trailer = json.split(',"trailer":"',1)[-1]
+                            # if ')"' in trailer:
+                                # trailer = trailer.split(')"')[0]
+                            # else:
+                                # trailer = trailer[:-1]
+                            # if trailer != '' or trailer != None or trailer != '"}]}':
+                                # if 'http://www.youtube.com/watch?hd=1&v=' in trailer:
+                                    # trailer = trailer.replace("http://www.youtube.com/watch?hd=1&v=", self.youtube_player).replace("http://www.youtube.com/watch?v=", self.youtube_player)
+                                # JsonTrailer = (str(duration) + ',' + trailer)
+                                # if JsonTrailer != '120,':
+                                    # JsonTrailerLST.append(JsonTrailer)
+                        # TrailerLST.extend(JsonTrailerLST)     
+                # except Exception,e:
+                    # self.log("getTrailerList failed! " + str(e), xbmc.LOGERROR)
+                    
+        # #Youtube
+        # if TrailersType == '3':
+            # self.log("getTrailerList, Youtube")
+            # try:
+                # YoutubeLST = self.createYoutubeFilelist(REAL_SETTINGS.getSetting('trailerschannel'), '2', '200', '2', '200')
+                
+                # for i in range(len(YoutubeLST)):    
+                    # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Youtube Trailers")
+                    # Youtube = YoutubeLST[i]
+                    # duration = Youtube.split(',')[0]
+                    # trailer = Youtube.split('\n', 1)[-1]
+                    
+                    # if trailer != '' or trailer != None:
+                        # YoutubeTrailer = (str(duration) + ',' + trailer)
+                        # YoutubeTrailerLST.append(YoutubeTrailer)
+                # TrailerLST.extend(YoutubeTrailerLST)
+            # except Exception,e:
+                # self.log("getTrailerList failed! " + str(e), xbmc.LOGERROR)
+                
+        # #Internet
+        # if TrailersType == '4':
+            # self.log("getTrailerList, Internet")
+            # try:   
+                # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Internet Trailers")
+                # TrailerLST = self.InternetTrailer()
+            # except Exception,e:
+                # self.log("getTrailerList failed! " + str(e), xbmc.LOGERROR)
+        # cleanup   
+        del LocalTrailerLST[:]
+        del JsonTrailerLST[:]
+        del YoutubeTrailerLST[:]
+        return TrailerLST       
+
+
+    def InternetTrailer(self, Cinema=False):
+        self.log("InternetTrailer, Cinema = " + str(Cinema))
+        TrailerLST = []
+        duration = 0
+        TrailersCount = 0
+        
+        if Cinema == 1:
+            TRes = '720p'
+            Ttype = 'coming_soon'
+            Tlimit = 90
+        elif Cinema == 2:
+            TRes = '720p'
+            Ttype = 'opening'
+            Tlimit = 90
+        else:
+            TResNum = {}
+            TResNum['0'] = '480p'
+            TResNum['1'] = '720p'
+            TResNum['2'] = '1080p'
+            TRes = (TResNum[REAL_SETTINGS.getSetting('trailersResolution')])
+
+            Ttypes = {}
+            Ttypes['0'] = 'latest'
+            Ttypes['1'] = 'most_watched'
+            Ttypes['2'] = 'coming_soon'
+            Ttype = (Ttypes[REAL_SETTINGS.getSetting('trailersHDnetType')])
+
+            T_Limit = [15,30,90,180,270,360]
+            Tlimit = T_Limit[int(REAL_SETTINGS.getSetting('trailersTitleLimit'))]
+        
+        try:
+            InternetTrailersLST1 = []
+            limit = Tlimit
+            loop = int(limit/15)
+            global page
+            page = None
+            movieLST = []
+            source = Ttype
+            resolution = TRes
+            n = 0
+            
+            if source == 'latest':
+                page = 1
+
+                for i in range(loop):
+                    movies, has_next_page = HDTrailers.get_latest(page=page)
+                    if has_next_page:
+                        page = page + 1
+
+                        for i, movie in enumerate(movies):
+                            movie_id = movie['id']
+                            movieLST.append(movie_id)
+                    else:
+                        break
+
+            elif source == 'most_watched':
+                movies, has_next_page = HDTrailers.get_most_watched()
+            elif source == 'coming_soon':
+                movies, has_next_page = HDTrailers.get_coming_soon()
+            elif source == 'opening':
+                movies, has_next_page = HDTrailers.get_opening_this_week()
+
+            if source != 'latest':
+                for i, movie in enumerate(movies):
+                    if n >= loop:
+                        break
+                    movie_id=movie['id']
+                    movieLST.append(movie_id)
+                    n += 1
+
+            for i in range(len(movieLST)):
+                movie, trailers, clips = HDTrailers.get_videos(movieLST[i])
+                videos = []
+                videos.extend(trailers)
+                items = []
+
+                for i, video in enumerate(videos):
+                    if resolution in video.get('resolutions'):
+                        source = video['source']
+                        url = video['resolutions'][resolution]
+
+                        if not 'http://www.hd-trailers.net/yahoo-redir.php' in url:
+                            playable_url = HDTrailers.get_playable_url(source, url)
+                            playable_url = playable_url.replace('plugin://plugin.video.youtube/?action=play_video&videoid=', self.youtube_player)
+                            try:
+                                tubeID = playable_url.split('videoid=')[1]
+                                duration = self.getYoutubeDuration(tubeID)
+                            except:
+                                duration = 120
+                            InternetTrailers = (str(duration) + ',' + str(playable_url))
+                            TrailerLST.append(InternetTrailers)  
+                            TrailersCount += 1
+                            self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="querying %s Internet Trailers"%str(TrailersCount))
+        except Exception,e:
+            self.log("InternetTrailer failed! " + str(e))
+
+        TrailerLST = sorted_nicely(TrailerLST)
+        if TrailerLST and len(TrailerLST) > 0:
+            random.shuffle(TrailerLST)
+        return TrailerLST
+    
+    
+    # Adapted from Ronie's screensaver.picture.slideshow * https://github.com/XBMC-Addons/screensaver.picture.slideshow/blob/master/resources/lib/utils.py    
+    def walk(self, path, types=MEDIA_TYPES):     
+        self.log("walk " + path + ' ,' + str(types))
+        video = []
+        folders = []
+        # multipath support
+        if path.startswith('multipath://'):
+            # get all paths from the multipath
+            paths = path[12:-1].split('/')
+            for item in paths:
+                folders.append(urllib.unquote_plus(item))
+        else:
+            folders.append(os.path.join(path,''))
+        for folder in folders:
+            if FileAccess.exists(xbmc.translatePath(folder)):
+                # get all files and subfolders
+                dirs,files = FileAccess.listdir(folder)
+                print dirs, files
+                # natural sort
+                convert = lambda text: int(text) if text.isdigit() else text
+                alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+                files.sort(key=alphanum_key)
+                for item in files:
+                    # filter out all video
+                    if os.path.splitext(item)[1].lower() in types:
+                        video.append(os.path.join(folder,item))
+                for item in dirs:
+                    # recursively scan all subfolders
+                    video += self.walk(os.path.join(folder,item)) # make sure paths end with a slash
+        # cleanup   
+        del folders[:]
+        return video
+        
+        
+    #Parse Plugin, return essential information. Not tmpstr         

@@ -16,11 +16,22 @@
 # You should have received a copy of the GNU General Public License
 # along with PseudoTV.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
+import os, sys, re, traceback
 import xbmcaddon, xbmc, xbmcgui, xbmcvfs
 import Settings
 
-from FileAccess import FileLock
+from FileAccess import FileLock 
+from pyfscache import *
+
+def log(msg, level = xbmc.LOGDEBUG):
+    if level == xbmc.LOGDEBUG:
+        xbmcgui.Window(10000).setProperty('PTVL.DEBUG_LOG', uni(msg))
+    else:
+        msg += ' ,' + traceback.format_exc()
+        xbmcgui.Window(10000).setProperty('PTVL.ERROR_LOG', uni(msg))
+    if DEBUG != True and level == xbmc.LOGDEBUG:
+        return
+    xbmc.log(ADDON_ID + '-' + ADDON_VERSION + '-' + uni(msg), level)
 
 def debug(msg, *args):
     try:
@@ -43,11 +54,18 @@ def debug(msg, *args):
 
 ADDON = xbmcaddon.Addon(id='script.pseudotv')
 ADDON_ID = ADDON.getAddonInfo('id')
+REAL_SETTINGS = xbmcaddon.Addon(id=ADDON_ID)
+ADDON_ID = REAL_SETTINGS.getAddonInfo('id')
 ADDON_NAME = ADDON.getAddonInfo('name')
+ADDON_NAME = REAL_SETTINGS.getAddonInfo('name')
+ADDON_PATH = REAL_SETTINGS.getAddonInfo('path').decode('utf-8')
+ADDON_VERSION = REAL_SETTINGS.getAddonInfo('version')
 LANGUAGE = ADDON.getLocalizedString
 CWD = ADDON.getAddonInfo('path').decode("utf-8")
 VERSION = ADDON.getAddonInfo('version')
 ICON = ADDON.getAddonInfo('icon')
+ICON = os.path.join(ADDON_PATH, 'icon.png')
+FANART = os.path.join(ADDON_PATH, 'fanart.jpg')
 
 def log(msg, level = xbmc.LOGDEBUG):
     try:
@@ -84,6 +102,20 @@ MODE_RANDOM = 8
 MODE_REALTIME = 16
 MODE_STARTMODES = MODE_RANDOM | MODE_REALTIME | MODE_RESUME
 
+# Ignore seeking for live feeds and other chtypes/plugins that don't support it.
+IGNORE_SEEKTIME_CHTYPE = [8,9]
+IGNORE_SEEKTIME_PLUGIN = []
+
+
+# Maximum is 10
+RULES_PER_PAGE = 7
+
+# Chtype Limit
+NUMBER_CHANNEL_TYPES = 17
+
+# Channel Limit, Current available max is 999
+CHANNEL_LIMIT = 999
+
 SETTINGS_LOC = ADDON.getAddonInfo('profile').decode("utf-8")
 CHANNEL_SHARING = False
 LOCK_LOC = xbmc.translatePath(os.path.join(SETTINGS_LOC, 'cache' + '/'))
@@ -92,9 +124,10 @@ if ADDON.getSetting('ChannelSharing') == "true":
     CHANNEL_SHARING = True
     LOCK_LOC = xbmc.translatePath(os.path.join(ADDON.getSetting('SettingsFolder'), 'cache' + '/'))
 
+CHANNELS_LOC = os.path.join(SETTINGS_LOC, 'cache' + '/')
+REQUESTS_LOC = xbmc.translatePath(os.path.join(CHANNELS_LOC, 'requests',''))
 IMAGES_LOC = xbmc.translatePath(os.path.join(CWD, 'resources', 'images' + '/'))
 LOGOS_LOC = xbmc.translatePath(os.path.join(CWD, 'resources', 'logos' + '/'))
-CHANNELS_LOC = os.path.join(SETTINGS_LOC, 'cache' + '/')
 GEN_CHAN_LOC = os.path.join(CHANNELS_LOC, 'generated' + '/')
 MADE_CHAN_LOC = os.path.join(CHANNELS_LOC, 'stored' + '/')
 CHANNELBUG_LOC = xbmc.translatePath(os.path.join(CHANNELS_LOC, 'ChannelBug' + '/'))
@@ -165,3 +198,87 @@ ACTION_PREV_PICTURE = 29
 
 EPG_ROWCOUNT = [3, 6, 9]
 ROWCOUNT = EPG_ROWCOUNT[int(ADDON.getSetting("EPGRowcount"))]
+
+REQUESTS_LOC = xbmc.translatePath(os.path.join(CHANNELS_LOC, 'requests',''))
+MADE_CHAN_LOC = os.path.join(CHANNELS_LOC, 'stored','')
+GEN_CHAN_LOC = os.path.join(CHANNELS_LOC, 'generated','')
+XMLTV_CACHE_LOC = xbmc.translatePath(os.path.join(CHANNELS_LOC, 'xmltv',''))
+STRM_CACHE_LOC = xbmc.translatePath(os.path.join(CHANNELS_LOC, 'strm','')) 
+MOUNT_LOC = xbmc.translatePath(os.path.join(CHANNELS_LOC, 'mountpnt',''))
+IMAGES_LOC = xbmc.translatePath(os.path.join(ADDON_PATH, 'resources', 'images',''))
+PTVL_SKIN_LOC = os.path.join(ADDON_PATH, 'resources', 'skins', '') #Path to PTVL Skin folder
+SFX_LOC = os.path.join(ADDON_PATH, 'resources','sfx','')
+XSP_LOC = xbmc.translatePath("special://profile/playlists/video/")
+XMLTV_LOC = xbmc.translatePath(os.path.join(REAL_SETTINGS.getSetting('xmltvLOC'),''))
+LOGO_LOC = xbmc.translatePath(os.path.join(REAL_SETTINGS.getSetting('ChannelLogoFolder'),'')) #Channel Logo location   
+PVR_DOWNLOAD_LOC = xbmc.translatePath(os.path.join(REAL_SETTINGS.getSetting('PVR_Folder'),'')) #PVR Download location
+
+
+# pyfscache globals
+cache_hourly = FSCache(REQUESTS_LOC, days=0, hours=1, minutes=0)
+cache_daily = FSCache(REQUESTS_LOC, days=1, hours=0, minutes=0)
+cache_weekly = FSCache(REQUESTS_LOC, days=7, hours=0, minutes=0)
+cache_monthly = FSCache(REQUESTS_LOC, days=28, hours=0, minutes=0)
+
+MUSIC_TYPES = (xbmc.getSupportedMedia('music')).split('|')  
+IMAGE_TYPES = (xbmc.getSupportedMedia('picture')).split('|')
+MEDIA_TYPES = (xbmc.getSupportedMedia('video')).split('|')
+STREAM_TYPES = ('http','https','rtsp','rtmp','udp','PlayMedia')
+BCT_TYPES = ['bumper', 'commercial', 'trailer', 'rating', 'pseudocinema', 'intro', 'cellphone', 'coming soon', 'premovie', 'feature presentation', 'intermission']
+
+# Eventghost broadcasts
+EG_ALL = ['Starting','Loading: CHANNELNAME','Sleeping','Exiting']
+
+# Limits
+FILELIST_LIMIT = [2048,4096,8192,16384]
+MAXFILE_DURATION = 16000
+MINFILE_DURATION = 900
+
+# Plugin exclusion strings
+SF_FILTER = ['isearch', 'iplay - kodi playlist manager','create new super folder','explore kodi favourites']
+EX_FILTER = SF_FILTER + ['This folder contains no content.','video resolver settings','<<','back','previous','home','search','find','clips','seasons','trailers']
+GETADDONS_FILTER = ['hdhomerun','pseudolibrary']
+
+# Duration in seconds "stacked" for chtypes >= 10
+BYPASS_EPG_SECONDS = 900
+
+# HEX COLOR OPTIONS 4 (Overlay CHANBUG, EPG Genre & CHtype) 
+# http://www.w3schools.com/html/html_colornames.asp
+COLOR_RED = '#FF0000'
+COLOR_GREEN = '#008000'
+COLOR_mdGREEN = '#3CB371'
+COLOR_BLUE = '#0000FF'
+COLOR_ltBLUE = '#ADD8E6'
+COLOR_CYAN = '#00FFFF'
+COLOR_ltCYAN = '##E0FFFF'
+COLOR_PURPLE = '#800080'
+COLOR_ltPURPLE = '#9370DB'
+COLOR_ORANGE = '#FFA500'
+COLOR_YELLOW = '#FFFF00'
+COLOR_GRAY = '#808080'
+COLOR_ltGRAY = '#D3D3D3'
+COLOR_mdGRAY = '#696969'
+COLOR_dkGRAY = '#A9A9A9'
+COLOR_BLACK = '#000000'
+COLOR_WHITE = '#FFFFFF'
+COLOR_HOLO = 'FF0297eb'
+COLOR_SMOKE = '#F5F5F5'
+
+# EPG Chtype/Genre COLOR TYPES
+COLOR_RED_TYPE = ['10', '17', 'TV-MA', 'R', 'NC-17', 'Youtube', 'Gaming', 'Sports', 'Sport', 'Sports Event', 'Sports Talk', 'Archery', 'Rodeo', 'Card Games', 'Martial Arts', 'Basketball', 'Baseball', 'Hockey', 'Football', 'Boxing', 'Golf', 'Auto Racing', 'Playoff Sports', 'Hunting', 'Gymnastics', 'Shooting', 'Sports non-event']
+COLOR_GREEN_TYPE = ['5', 'News', 'Public Affairs', 'Newsmagazine', 'Politics', 'Entertainment', 'Community', 'Talk', 'Interview', 'Weather']
+COLOR_mdGREEN_TYPE = ['9', 'Suspense', 'Horror', 'Horror Suspense', 'Paranormal', 'Thriller', 'Fantasy']
+COLOR_BLUE_TYPE = ['Comedy', 'Comedy-Drama', 'Romance-Comedy', 'Sitcom', 'Comedy-Romance']
+COLOR_ltBLUE_TYPE = ['2', '4', '14', '15', '16', 'Movie']
+COLOR_CYAN_TYPE = ['8', 'Documentary', 'History', 'Biography', 'Educational', 'Animals', 'Nature', 'Health', 'Science & Tech', 'Learning & Education', 'Foreign Language']
+COLOR_ltCYAN_TYPE = ['Outdoors', 'Special', 'Reality', 'Reality & Game Shows']
+COLOR_PURPLE_TYPE = ['Drama', 'Romance', 'Historical Drama']
+COLOR_ltPURPLE_TYPE = ['12', '13', 'LastFM', 'Vevo', 'VevoTV', 'Musical', 'Music', 'Musical Comedy']
+COLOR_ORANGE_TYPE = ['11', 'TV-PG', 'TV-14', 'PG', 'PG-13', 'RSS', 'Animation', 'Animation & Cartoons', 'Animated', 'Anime', 'Children', 'Cartoon', 'Family']
+COLOR_YELLOW_TYPE = ['1', '3', '6', 'TV-Y7', 'TV-Y', 'TV-G', 'G', 'Classic TV', 'Action', 'Adventure', 'Action & Adventure', 'Action and Adventure', 'Action Adventure', 'Crime', 'Crime Drama', 'Mystery', 'Science Fiction', 'Series', 'Western', 'Soap', 'Soaps', 'Variety', 'War', 'Law', 'Adults Only']
+COLOR_GRAY_TYPE = ['Auto', 'Collectibles', 'Travel', 'Shopping', 'House Garden', 'Home & Garden', 'Home and Garden', 'Gardening', 'Fitness Health', 'Fitness', 'Home Improvement', 'How-To', 'Cooking', 'Fashion', 'Beauty & Fashion', 'Aviation', 'Dance', 'Auction', 'Art', 'Exercise', 'Parenting', 'Food', 'Health & Fitness']
+COLOR_ltGRAY_TYPE = ['0', '7', 'NR', 'Consumer', 'Game Show', 'Other', 'Unknown', 'Religious', 'Anthology', 'None']
+
+# Core Default Image Locations
+DEFAULT_MEDIA_LOC =  xbmc.translatePath(os.path.join(ADDON_PATH, 'resources', 'skins', 'Default', 'media',''))
+DEFAULT_EPGGENRE_LOC = xbmc.translatePath(os.path.join(ADDON_PATH, 'resources', 'skins', 'Default', 'media', 'epg-genres',''))

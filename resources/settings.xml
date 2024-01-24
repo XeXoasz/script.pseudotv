@@ -28,16 +28,6 @@
         <setting id="ChannelBugPosition" type="enum" subsetting="true" label="30048" visible="eq(-1,true)" lvalues="30117|30118|30119|30120|30231|30232|30233|30234" default="2"/>
 		<setting id="ColorBug" type="bool" subsetting="true" label="30210" visible="eq(-2,true)" default="false"/>
 		<setting id="BugBrightness" type="enum" subsetting="true" label="30208" values=".25|.5|.75|1 (Unchanged)|1.25|1.5|1.75|2|2.25|2.5|2.75|3" default="7" visible="eq(-3,true)"/>
-		<setting id="SpecificChannelBugPosition" type="bool" label="30235" default="false"/>
-        <setting type="lsep" subsetting="true" label="30236"/>
-		<setting id="altBugPosition1" type="text" label="30117" default="" />
-        <setting id="altBugPosition2" type="text" label="30118" default="" />
-		<setting id="altBugPosition3" type="text" label="30119" default="" />
-        <setting id="altBugPosition4" type="text" label="30120" default="" />
-		<setting id="altBugPosition5" type="text" label="30231" default="" />
-        <setting id="altBugPosition6" type="text" label="30232" default="" />
-		<setting id="altBugPosition7" type="text" label="30233" default="" />
-        <setting id="altBugPosition8" type="text" label="30234" default="" />
 		<setting type="sep"/>
 		<setting id="ClockMode" type="enum" label="30014" default="0" lvalues="30121|30122"/>
 		<setting type="sep"/>
@@ -46,9 +36,37 @@
 		<setting type="lsep" label="30222"/>
 		<setting id="altcolorchannels1" type="text" label="30223" default=""/>
 		<setting id="altcolorchannels2" type="text" label="30224" default=""/>
-		<setting id="altcolorchannels3" type="text" label="30225" default=""/>
-		<setting type="sep"/>
+		<setting id="altcolorchannels3" type="text" label="30225" default=""/>		
 	</category>
+
+	<!--BCTs-->   
+    <category label="60004">
+    <setting label="30500" type="lsep"/>
+        <setting label="30501" id="bumpers" type="enum" values="Disabled|Local|Community List" default="0" />
+        <setting label="30502" id="bumpersfolder" subsetting="true" type="folder" source="auto" visible="eq(-1,1)" default="" />
+        <setting label="39504" id="bumperratings" subsetting="true" type="bool" visible="!eq(-2,0)" enable="System.HasAddon(plugin.video.youtube)" default="false" />
+        <setting label="30503" id="numbumpers" subsetting="true" type="enum" visible="!eq(-3,0)" values="1|2|3|4|5" default="0"/>
+    <setting label="30510" type="lsep"/>
+        <setting label="30511" id="commercials" type="enum" values="Disabled|Local|Youtube|Plugin" default="0"/>
+        <setting label="30512" id="commercialsfolder" subsetting="true" type="folder" source="auto" visible="eq(-1,1)" default=""/>
+        <setting label="30517" id="commercialschannel" subsetting="true" type="text" visible="eq(-2,2)" enable="System.HasAddon(plugin.video.youtube)" default="PLlwhS0wsCzbRNwJ4Epac4rHJJ_6m1JaBm"/>
+        <setting label="30514" id="Advertlog" subsetting="true" visible="eq(-3,3)" type="bool" enable="System.HasAddon(plugin.video.advertlog)" default="false" />
+        <setting label="30516" id="iSpot" subsetting="true" visible="eq(-4,3)" type="bool" enable="System.HasAddon(plugin.video.ispot)" default="false" />
+        <setting label="30519" id="AsSeenOn" subsetting="true" visible="eq(-5,2)" type="bool" enable="System.HasAddon(plugin.video.youtube)" default="false" />
+        <setting label="30518" id="numcommercials" type="enum" subsetting="true" visible="!eq(-6,0)" values="1|2|3|4|5" default="0"/>
+    
+    
+    <setting label="30520" type="lsep"/>
+        <setting label="30521" id="trailers" type="enum" values="Disabled" default="0"/><!-- |Local|Kodi Library|Youtube|Plugin" -->
+        <setting label="30522" id="trailersfolder" subsetting="true" type="folder" source="auto" visible="eq(-1,1)" default="" />
+        <setting label="30523" id="trailersgenre" subsetting="true" type="bool" visible="eq(-2,2)" default="false" />
+        <setting label="30524" id="Movietrailers" subsetting="true" type="bool" visible="!eq(-3,0)" default="false" />
+        <setting label="30527" id="HDtrailers" subsetting="true" type="bool" visible="eq(-4,4)" enable="false" default="false" />
+        <setting label="30525" id="AppleTrailers" subsetting="true" type="bool" visible="eq(-5,4)" enable="false" default="false" />
+        <setting label="30528" id="TrailerAddict" subsetting="true" type="bool" visible="eq(-6,4)" enable="false" default="false" />
+        <setting label="30517" id="trailerschannel" subsetting="true" type="text" visible="eq(-7,3)" enable="System.HasAddon(plugin.video.youtube)" default="PL1DD10E84B9B08A35" /> 
+        <setting label="30530" id="numtrailers" subsetting="true" type="enum" visible="!eq(-8,0)" values="1|2|3|4|5" default="0"/>
+    </category>
 
 	<category label="30022">
 		<setting id="MediaLimit" type="enum" label="30044" lvalues="30132|30133|30134|30135|30136|30137|30138|30139" default="1"/>
@@ -56,6 +74,7 @@
 		<setting id="HideLeadingZeroes" type="bool" label="30209" default="false"/>
 		<setting id="SeekForward" type="enum" label="30046" lvalues="30149|30150|30151|30152|30153|30154|30155" default="1"/>
 		<setting id="SeekBackward" type="enum" label="30047" lvalues="30156|30157|30158|30159|30160|30161|30162" default="1"/>
+		<setting id="Enable_quickflip" type="bool"   label="30374" default="false"/>
 		<setting type="sep"/>
 		<setting id="StartChannel" type="text" label="30191" default="1"/>
 		<setting id="AlwaysUseStartChannel" type="bool" label="30192" default="false"/>
@@ -109,6 +128,14 @@
 		<setting id="enable" type="bool" label="30027" default="false"/>
 		<setting id="timer_amount" type="enum" lvalues="30164|30109|30114|30123|30163" label="30028" enable="eq(-1,true)" default="1"/>
 		<setting id="notify" type="bool" label="30029" enable="eq(-2,true)" default="true"/>
+	</category>
+	
+	<!--Debugging-->
+    <category label="60009"> 
+        <setting label="30914" type="lsep"/>
+        <setting id="Include3D" type="bool"   label="39958" default="false"/>
+        <setting id="IncludeIceLib" type="bool"   label="30997" default="true"/>
+        <setting id="IncludeBCTs" type="bool"   label="39997" default="true"/>
 	</category>
 	
 </settings>

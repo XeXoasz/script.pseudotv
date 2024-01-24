@@ -949,10 +949,122 @@ msgctxt "#30234"
 msgid "lower left 4:3"
 msgstr ""
 
-msgctxt "#30235"
-msgid "Specific watermark channel positions"
+msgctxt "#60004"
+msgid "BCTs"
 msgstr ""
 
-msgctxt "#30236"
-msgid "Alternate Channel Watermarks/ ex: 1,2,3"
+msgctxt "#30500"
+msgid "(B)umpers:"
+msgstr ""
+
+msgctxt "#30501"
+msgid "Enable Bumpers"
+msgstr ""
+
+msgctxt "#30502"
+msgid "Select Bumper Folder [COLOR=dimgrey][Requires Channel Subfolders]"
+msgstr ""
+
+msgctxt "#30503"
+msgid "Number of Bumpers Between Shows"
+msgstr ""
+
+msgctxt "#39504"
+msgid "Add Ratings Between Movies"
+msgstr ""
+
+msgctxt "#30510"
+msgid "(C)ommercials:"
+msgstr ""
+
+msgctxt "#30511"
+msgid "Enable Commercials"
+msgstr ""
+
+msgctxt "#30512"
+msgid "Select Commercials Folder [COLOR=dimgrey][Requires Channel Subfolders]"
+msgstr ""
+
+msgctxt "#30514"
+msgid "Add Advertlog"
+msgstr ""
+
+msgctxt "#30515"
+msgid "Add Telly Ads"
+msgstr ""
+
+msgctxt "#30516"
+msgid "Add iSpot"
+msgstr ""
+
+msgctxt "#30517"
+msgid "Youtube Playlist"
+msgstr ""
+
+msgctxt "#30519"
+msgid "Add As Seen On TV Ads"
+msgstr ""
+
+msgctxt "#30518"
+msgid "Number of Commercials Between Shows"
+msgstr ""
+
+msgctxt "#30520"
+msgid "(T)railers:"
+msgstr ""
+
+msgctxt "#30521"
+msgid "Enable Trailers"
+msgstr ""
+
+msgctxt "#30522"
+msgid "Select Trailer Folder"
+msgstr ""
+
+msgctxt "#30523"
+msgid "Match Trailer Genre to Genre Channels"
+msgstr ""
+
+msgctxt "#30524"
+msgid "Enable Trailers in Movie Channels"
+msgstr ""
+
+msgctxt "#30525"
+msgid "Add HDTrailers"
+msgstr ""
+
+msgctxt "#30527"
+msgid "Add Apple Trailers"
+msgstr ""
+
+msgctxt "#30528"
+msgid "Add Trailer Addict"
+msgstr ""
+
+msgctxt "#30530"
+msgid "Number of Trailers Between Shows"
+msgstr ""
+
+msgctxt "#60009"
+msgid "Debug"
+msgstr ""
+
+msgctxt "#30914"
+msgid "Global Controls:"
+msgstr ""
+
+msgctxt "#39958"
+msgid "Include 3D Content [COLOR=dimgrey][Global]"
+msgstr ""
+
+msgctxt "#30997"
+msgid "Include Strm Content [COLOR=dimgrey][Global]"
+msgstr ""
+
+msgctxt "#39997"
+msgid "Include BCT Content [COLOR=dimgrey][Global]"
+msgstr ""
+
+msgctxt "#30374"
+msgid "Enable Quickflip [COLOR=dimgrey][Surfing ignores plugins & strms][/COLOR]"
 msgstr ""
