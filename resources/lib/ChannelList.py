@@ -53,6 +53,7 @@ class ChannelList:
         self.runningActionId = 0
         self.enteredChannelCount = 0
         self.background = True
+        self.quickFlip = False
         self.quickflipEnabled = False
         self.AlreadyWarned = False
         self.DirAlreadyWarned = False
@@ -95,12 +96,14 @@ class ChannelList:
         self.UseEpisodeTitleHideTitle = ADDON.getSetting('UseEpisodeTitleHideTitle').split(",")
         self.HideDirectoryTitle = ADDON.getSetting('HideDirectoryTitle').split(",")
         self.incIceLibrary = ADDON.getSetting('IncludeIceLib') == "true"
+        self.quickFlip = ADDON.getSetting('Enable_quickflip') == "true"
+        self.startTime = time.time()
         self.log("IceLibrary is " + str(self.incIceLibrary))
         self.incBCTs = ADDON.getSetting('IncludeBCTs') == "true"
         self.log("IncludeBCTs is " + str(self.incBCTs))
         self.includeMeta = ADDON.getSetting('IncludeMeta') == "true"
         self.log("IncludeMeta is " + str(self.includeMeta))
-        self.quickFlip = REAL_SETTINGS.getSetting('Enable_quickflip') == "true"
+        
         
         if self.forceReset:
             ADDON.setSetting('ForceChannelReset', "False")
@@ -310,7 +313,6 @@ class ChannelList:
                 createlist = True
 
                 if self.channels[channel - 1].setPlaylist(CHANNELS_LOC + 'channel_' + str(channel) + '.m3u') == True:
-                    self.setBackgroundStatus("Initializing: Loading Channel " + str(channel),string2='loading playlist')
                     self.channels[channel - 1].isValid = True
                     self.channels[channel - 1].fileName = CHANNELS_LOC + 'channel_' + str(channel) + '.m3u'
                     timedif = time.time() - self.lastResetTime
@@ -382,7 +384,6 @@ class ChannelList:
                 if self.channels[channel - 1].setPlaylist(CHANNELS_LOC + 'channel_' + str(channel) + '.m3u') == True:
                     returnval = True
                     self.updateDialogProgress = (channel - 1) // self.enteredChannelCount
-                    self.setBackgroundStatus("Initializing: Loading Channel " + str(channel),inc=self.updateDialogProgress,string2='reading playlist')
                     self.channels[channel - 1].fileName = CHANNELS_LOC + 'channel_' + str(channel) + '.m3u'
                     self.channels[channel - 1].isValid = True
                     
@@ -404,7 +405,6 @@ class ChannelList:
         if append == False and self.myOverlay.isMaster:
             self.clearPlaylistHistory(channel)
             self.updateDialogProgress = (channel - 1) // self.enteredChannelCount
-            self.setBackgroundStatus("Initializing: Loading Channel " + str(channel),inc=self.updateDialogProgress,string2='clearing playlist')
             
         if append == False:
             self.runActions(RULES_ACTION_BEFORE_TIME, channel, self.channels[channel - 1])
@@ -502,7 +502,28 @@ class ChannelList:
                 return os.path.split(setting1)[1]
 
         return ''
-
+    
+    def getChtype(self, channel): 
+        self.log("getChtype")
+        try:
+            return int(ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_type'))
+        except:
+            return 9999
+        
+        
+    def getChname(self, channel):
+        self.log("getChname")
+        try:
+            if int(ADDON_SETTINGS.getSetting('Channel_' + str(channel) + '_rulecount')) > 0:
+                for i in range(RULES_PER_PAGE):         
+                    try:
+                        if int(ADDON_SETTINGS.getSetting("Channel_" + str(channel) + "_rule_%s_id" %str(i+1))) == 1:
+                            return ADDON_SETTINGS.getSetting("Channel_" + str(channel) + "_rule_%s_opt_1" %str(i+1))
+                    except:
+                        pass
+        except:
+            pass
+        return ''
 
     # Open the smart playlist and read the name out of it...this is the channel name
     def getSmartPlaylistName(self, fle):
@@ -843,7 +864,6 @@ class ChannelList:
 
             if duration > 0:
                filecount += 1
-               self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding %s Videos" % str(filecount),inc=int(((filecount) // channel) // self.enteredChannelCount))
                title = (os.path.split(LocalFLE)[1])
                title = os.path.splitext(title)[0].replace('.', ' ')
                description = LocalFLE.replace('//','/').replace('/','\\')
@@ -1464,19 +1484,16 @@ class ChannelList:
                 if len(BumperLST) > 0:  
                     random.shuffle(BumperLST)              
                     for n in range(int(REAL_SETTINGS.getSetting("numbumpers")) + 1):
-                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Bumpers")
                         newFileList.append(random.choice(BumperLST))#random fill
 
                 if len(CommercialLST) > 0:
                     random.shuffle(CommercialLST)                
                     for n in range(int(REAL_SETTINGS.getSetting("numcommercials")) + 1):
-                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Commercials")
                         newFileList.append(random.choice(CommercialLST))#random fill
                         
                 if len(TrailerLST) > 0:
                     random.shuffle(TrailerLST)                
                     for n in range(int(REAL_SETTINGS.getSetting("numtrailers")) + 1):
-                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Trailers")
                         newFileList.append(random.choice(TrailerLST))#random fill
     #random.shuffle(newFileList)
                 
@@ -1507,8 +1524,7 @@ class ChannelList:
             self.log("getBumperList - Internet - " + chname)
             Bumper_List = 'http://raw.github.com/PseudoTV/PseudoTV_Lists/master/bumpers.ini'
             linesLST = read_url_cached(Bumper_List, return_type='readlines')
-            for i in range(len(Bumper_List)): 
-                self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="querying %i Internet Bumpers"%i)                    
+            for i in range(len(Bumper_List)):                 
                 try:                 
                     ChannelName,BumperNumber,BumperSourceID = (str(linesLST[i]).replace('\n','').replace('\r','').replace('\t','')).split('|')
                     BumperSource,BumperID = BumperSourceID.split('_')
@@ -1546,7 +1562,6 @@ class ChannelList:
                     newFileList.append(fileList[i])
                     lineLST = (fileList[i]).split('movie|')[1]
                     mpaa = (lineLST.split('\n')[0]).split('|')[4]
-                    self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Ratings: " + str(mpaa))
                     
                     for i in range(len(Ratings)):
                         ID = 'qlRaA8tAfc0'
@@ -1595,7 +1610,6 @@ class ChannelList:
         
     def InternetCommercial(self):
         self.log("InternetCommercial")
-        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Internet Commercials")     
         CommercialLST = []
         #todo add plugin parsing...
         if len(CommercialLST) > 0:
@@ -1622,7 +1636,6 @@ class ChannelList:
                 LocalLST = self.walk(PATH)        
                 for i in range(len(LocalLST)): 
                     try:   
-                        self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Local Trailers")
                         LocalFLE = LocalLST[i]
                         if '-trailer' in LocalFLE:
                             duration = self.getDuration(LocalFLE)
@@ -1644,7 +1657,7 @@ class ChannelList:
                 # match = [s for s in JsonLST if chname in s]
                 
                 # for i in range(len(match)):    
-                    # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Library Genre Trailers")
+                    # self.setBackground("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Library Genre Trailers")
                     # duration = 120
                     # json = (match[i])
                     # trailer = json.split(',"trailer":"',1)[-1]
@@ -1671,7 +1684,7 @@ class ChannelList:
                         # JsonLST = (json_detail.split("},{"))
                         # match = [s for s in JsonLST if 'trailer' in s]
                         # for i in range(len(match)):                  
-                            # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Library Trailers")
+                            # self.setBackground("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Library Trailers")
                             # duration = 120
                             # json = (match[i])
                             # trailer = json.split(',"trailer":"',1)[-1]
@@ -1696,7 +1709,7 @@ class ChannelList:
                 # YoutubeLST = self.createYoutubeFilelist(REAL_SETTINGS.getSetting('trailerschannel'), '2', '200', '2', '200')
                 
                 # for i in range(len(YoutubeLST)):    
-                    # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Youtube Trailers")
+                    # self.setBackground("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Youtube Trailers")
                     # Youtube = YoutubeLST[i]
                     # duration = Youtube.split(',')[0]
                     # trailer = Youtube.split('\n', 1)[-1]
@@ -1712,7 +1725,7 @@ class ChannelList:
         # if TrailersType == '4':
             # self.log("getTrailerList, Internet")
             # try:   
-                # self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Internet Trailers")
+                # self.setBackground("Initializing: Loading Channel " + str(self.settingChannel),string2="adding Internet Trailers")
                 # TrailerLST = self.InternetTrailer()
             # except Exception,e:
                 # self.log("getTrailerList failed! " + str(e), xbmc.LOGERROR)
@@ -1815,7 +1828,6 @@ class ChannelList:
                             InternetTrailers = (str(duration) + ',' + str(playable_url))
                             TrailerLST.append(InternetTrailers)  
                             TrailersCount += 1
-                            self.setBackgroundStatus("Initializing: Loading Channel " + str(self.settingChannel),string2="querying %s Internet Trailers"%str(TrailersCount))
         except Exception,e:
             self.log("InternetTrailer failed! " + str(e))
 

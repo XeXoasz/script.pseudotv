@@ -141,7 +141,14 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         self.showingInfo = False
         self.showChannelBug = False
         self.channelBugPosition = 0
-        self.isChannelChanging = False    
+        self.altBugPosition1 = ADDON.getSetting('altBugPosition1').split(",")
+        self.altBugPosition2 = ADDON.getSetting('altBugPosition2').split(",")
+        self.altBugPosition3 = ADDON.getSetting('altBugPosition3').split(",")
+        self.altBugPosition4 = ADDON.getSetting('altBugPosition4').split(",")
+        self.altBugPosition5 = ADDON.getSetting('altBugPosition5').split(",")
+        self.altBugPosition6 = ADDON.getSetting('altBugPosition6').split(",")
+        self.altBugPosition7 = ADDON.getSetting('altBugPosition7').split(",")
+        self.altBugPosition8 = ADDON.getSetting('altBugPosition8').split(",")
         self.notificationLastChannel = 0
         self.notificationLastShow = 0
         self.notificationShowedNotif = False
@@ -337,6 +344,14 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         self.log('Show info label on channel change is ' + str(self.infoOnChange) + str(self.infoDuration))
         self.showChannelBug = ADDON.getSetting("ShowChannelBug") == "true"
         self.channelBugPosition = CHANNELBUG_POS[int(ADDON.getSetting("ChannelBugPosition"))]
+        self.altBugPosition1 = CHANNELBUG_POS[0]
+        self.altBugPosition2 = CHANNELBUG_POS[1]
+        self.altBugPosition3 = CHANNELBUG_POS[2]
+        self.altBugPosition4 = CHANNELBUG_POS[3]
+        self.altBugPosition5 = CHANNELBUG_POS[4]
+        self.altBugPosition6 = CHANNELBUG_POS[5]
+        self.altBugPosition7 = CHANNELBUG_POS[6]
+        self.altBugPosition8 = CHANNELBUG_POS[7]
         self.log('Show channel bug - ' + str(self.showChannelBug))
         self.forceReset = ADDON.getSetting('ForceChannelReset') == "true"
         self.StartChannel = ADDON.getSetting('StartChannel')
@@ -501,7 +516,7 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         self.Player.seekTime(seektime)
 
 
-    def setChannel(self, channel, surfing=False):
+    def setChannel(self, channel):
         self.log('setChannel ' + str(channel))
         self.runActions(RULES_ACTION_OVERLAY_SET_CHANNEL, channel, self.channels[channel - 1])
 
@@ -516,10 +531,7 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         if self.channels[channel - 1].isValid == False:
             self.log('setChannel channel not valid ' + str(channel), xbmc.LOGERROR)
             return
-        
-        if self.currentChannel != self.getLastChannel():
-            self.setLastChannel()
-        
+
         self.lastActionTime = 0
         timedif = 0
         self.getControl(102).setVisible(False)
@@ -528,18 +540,16 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
 
         # first of all, save playing state, time, and playlist offset for
         # the currently playing channel
-        if self.Player.isPlaying() == True:
+        if self.Player.isPlaying():
             if channel != self.currentChannel:
-                if self.getChtype(self.currentChannel) not in IGNORE_SEEKTIME_CHTYPE:
-                    self.channels[self.currentChannel - 1].setPaused(xbmc.getCondVisibility('Player.Paused'))
+                self.channels[self.currentChannel - 1].setPaused(xbmc.getCondVisibility('Player.Paused'))
 
-                    # Automatically pause in serial mode
-                    if self.channels[self.currentChannel - 1].mode & MODE_ALWAYSPAUSE > 0:
-                        self.channels[self.currentChannel - 1].setPaused(True)
-                # set resume points
+                # Automatically pause in serial mode
+                if self.channels[self.currentChannel - 1].mode & MODE_ALWAYSPAUSE > 0:
+                    self.channels[self.currentChannel - 1].setPaused(True)
+
                 self.channels[self.currentChannel - 1].setShowTime(self.Player.getTime())
-                # self.channels[self.currentChannel - 1].setShowPosition(xbmc.PlayList(xbmc.PLAYLIST_MUSIC).getposition())
-                self.channels[self.currentChannel - 1].setShowPosition(self.channels[self.currentChannel - 1].playlistPosition)
+                self.channels[self.currentChannel - 1].setShowPosition(xbmc.PlayList(xbmc.PLAYLIST_MUSIC).getposition())
                 self.channels[self.currentChannel - 1].setAccessTime(time.time())
 
             if (str(self.currentChannel) in self.languageChangeChannel) and (len(self.languageChange) == 2):
@@ -548,58 +558,13 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
             elif (str(self.currentChannel) in self.languageChangeChannel2) and (len(self.languageChange2) == 2):
                self.log('changing back audio for channel = ' + str(self.currentChannel)) 
                self.changeAudio(self.languageChange2[1])
-        
+
         self.previousChannel = self.currentChannel
         self.currentChannel = channel
-
-        if ADDON.getSettingBool("ResetWatched"):
-            Reset = ResetWatched()
-
-        # about to switch new channel
-        self.isChannelChanging = True
-        self.currentChannel = channel
-        chname = self.getChname(self.currentChannel)
-        chtype = self.getChtype(self.currentChannel)
-        mediapath = self.channels[self.currentChannel - 1].getItemFilename(self.channels[self.currentChannel - 1].playlistPosition)
-        self.log("setChannel, loading file = " + ascii(mediapath))
-
-        timedif = 0
-        self.infoOffset = 0
-        self.lastActionTime = 0
-        self.notPlayingCount = 0
-
-        self.Player.ignoreNextStop = False         
-        # First, check to see if the video stop should be ignored
-        if chtype in IGNORE_SEEKTIME_CHTYPE:#mediapath[-4:].lower() != 'strm':
-            self.Player.ignoreNextStop = True
-            self.log("setChannel, ignoreNextStop")
-
-        if surfing == True and self.channelList.quickflipEnabled == True:  
-            if chtype in [15,16] or mediapath[-4:].lower() == 'strm':
-                self.log("setChannel, about to quickflip")
-                if self.notPlayingAction == 'Up':
-                    self.isChannelChanging = False
-                    self.channelUp()
-                    return
-                elif self.notPlayingAction == 'Down':
-                    self.isChannelChanging = False
-                    self.channelDown()
-                    return
-        # switch to new channel
-        if self.channelThread.isAlive():
-            self.channelThread.pause()
-
-        self.isChannelSet = False
-        self.setBackgroundVisible(True)
-
         # now load the proper channel playlist
         xbmc.PlayList(xbmc.PLAYLIST_MUSIC).clear()
         self.log("about to load")
 
-        # Delay Playback to correct for subtitle service bug
-        xbmc.sleep(100)
-        
-        self.log("setChannel, loading playlist = " + ascii(self.channels[self.currentChannel - 1].fileName))
         if xbmc.PlayList(xbmc.PLAYLIST_MUSIC).load(self.channels[channel - 1].fileName) == False:
             self.log("Error loading playlist", xbmc.LOGERROR)
             self.InvalidateChannel(channel)
@@ -620,17 +585,17 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
             while self.channels[self.currentChannel - 1].showTimeOffset + timedif > self.channels[self.currentChannel - 1].getCurrentDuration():
                 timedif -= self.channels[self.currentChannel - 1].getCurrentDuration() - self.channels[self.currentChannel - 1].showTimeOffset
                 self.channels[self.currentChannel - 1].addShowPosition(1)
-                self.channels[self.currentChannel - 1].setShowTime(0)     
+                self.channels[self.currentChannel - 1].setShowTime(0)
+
+        
 
         xbmc.sleep(self.channelDelay)
         # set the show offset
         self.Player.playselected(self.channels[self.currentChannel - 1].playlistPosition)
         self.log("playing selected file")
-        
         # set the time offset
         self.channels[self.currentChannel - 1].setAccessTime(curtime)
         
-        # set the show offset
         if self.channels[self.currentChannel - 1].isPaused:
             self.channels[self.currentChannel - 1].setPaused(False)
             self.log('The seek bit - paused')
@@ -891,39 +856,54 @@ class TVOverlay(xbmcgui.WindowXMLDialog):
         self.channelLabelTimer.start()
         self.startNotificationTimer()
 
-    def setChannelBug(self):
-        posx = self.channelBugPosition[0]
-        posy = self.channelBugPosition[1]
+def setChannelBug(self):
+    posx = self.altBugPosition1[0]
+    posy = self.altBugPosition1[1]
+    posx = self.altBugPosition2[0]
+    posy = self.altBugPosition2[1]
+    posx = self.altBugPosition3[0]
+    posy = self.altBugPosition3[1]
+    posx = self.altBugPosition4[0]
+    posy = self.altBugPosition4[1]
+    posx = self.altBugPosition5[0]
+    posy = self.altBugPosition5[1]
+    posx = self.altBugPosition6[0]
+    posy = self.altBugPosition6[1]
+    posx = self.altBugPosition7[0]
+    posy = self.altBugPosition7[1]
+    posx = self.altBugPosition8[0]
+    posy = self.altBugPosition8[1]
+    posx = self.channelBugPosition[0]
+    posy = self.channelBugPosition[1]
 
-        if self.showChannelBug:
-            try:
-                if not FileAccess.exists(self.channelLogos + ascii(self.channels[self.currentChannel - 1].name) + '.png'):
-                    self.getControl(103).setImage(IMAGES_LOC + 'Default2.png')
-                    self.getControl(103).setPosition(posx, posy)
-                original = Image.open(self.channelLogos + ascii(self.channels[self.currentChannel - 1].name) + '.png')
-
-                if self.ColorBug:
-                    converted_img =  original.convert('RGBA')
-                else:
-                    converted_img = original.convert('LA')
-
-                img_bright = ImageEnhance.Brightness(converted_img)
-                converted_img = img_bright.enhance(self.BugBrightness)
-
-                if not FileAccess.exists(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png'):
-                    converted_img.save(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png')
-                self.getControl(103).setImage(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png')
+    if self.showChannelBug:
+        try:
+            if not FileAccess.exists(self.channelLogos + ascii(self.channels[self.currentChannel - 1].name) + '.png'):
+                self.getControl(103).setImage(IMAGES_LOC + 'Default2.png')
                 self.getControl(103).setPosition(posx, posy)
+            original = Image.open(self.channelLogos + ascii(self.channels[self.currentChannel - 1].name) + '.png')
 
-            except:
-               if not FileAccess.exists(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png'):
-                    self.getControl(103).setImage(IMAGES_LOC + 'Default2.png')
-               else:
-                    self.getControl(103).setImage(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png')
-               self.getControl(103).setPosition(posx, posy)
-        else:
-            self.getControl(103).setImage('')
+            if self.ColorBug:
+                converted_img =  original.convert('RGBA')
+            else:
+                converted_img = original.convert('LA')
 
+            img_bright = ImageEnhance.Brightness(converted_img)
+            converted_img = img_bright.enhance(self.BugBrightness)
+
+            if not FileAccess.exists(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png'):
+                converted_img.save(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png')
+            self.getControl(103).setImage(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png')
+            self.getControl(103).setPosition(posx, posy)
+
+        except:
+            if not FileAccess.exists(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png'):
+                self.getControl(103).setImage(IMAGES_LOC + 'Default2.png')
+            else:
+                self.getControl(103).setImage(CHANNELBUG_LOC + ascii(self.channels[self.currentChannel - 1].name) + '.png')
+            self.getControl(103).setPosition(posx, posy)
+    else:
+        self.getControl(103).setImage('')
 
     # Called from the timer to hide the channel label.
     def hideChannelLabel(self):
