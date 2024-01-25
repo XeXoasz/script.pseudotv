@@ -124,20 +124,20 @@ class ChannelListThread(threading.Thread):
                     if self.myOverlay.isMaster:
                         if chtype != 9999:
                             if curtotal > 0 and chtype not in FORCE_MAKENEW:
-                            # When appending, many of the channel variables aren't set, so copy them over.
-                            # This needs to be done before setup since a rule may use one of the values.
-                            # It also needs to be done after since one of them may have changed while being setup.
-                            self.chanlist.channels[i].playlistPosition =  xbmc.PlayList(xbmc.PLAYLIST_MUSIC).getposition()
-                            # self.chanlist.channels[i].playlistPosition = self.myOverlay.channels[i].playlistPosition
-                            self.chanlist.channels[i].showTimeOffset = self.myOverlay.channels[i].showTimeOffset
-                            self.chanlist.channels[i].lastAccessTime = self.myOverlay.channels[i].lastAccessTime
-                            self.chanlist.channels[i].totalTimePlayed = self.myOverlay.channels[i].totalTimePlayed
-                            self.chanlist.channels[i].isPaused = self.myOverlay.channels[i].isPaused
-                            self.chanlist.channels[i].mode = self.myOverlay.channels[i].mode
-                            
-                            # set resume points
+                                # When appending, many of the channel variables aren't set, so copy them over.
+                                # This needs to be done before setup since a rule may use one of the values.
+                                # It also needs to be done after since one of them may have changed while being setup.
+                                self.chanlist.channels[i].playlistPosition =  xbmc.PlayList(xbmc.PLAYLIST_MUSIC).getposition()
+                                # self.chanlist.channels[i].playlistPosition = self.myOverlay.channels[i].playlistPosition
+                                self.chanlist.channels[i].showTimeOffset = self.myOverlay.channels[i].showTimeOffset
+                                self.chanlist.channels[i].lastAccessTime = self.myOverlay.channels[i].lastAccessTime
+                                self.chanlist.channels[i].totalTimePlayed = self.myOverlay.channels[i].totalTimePlayed
+                                self.chanlist.channels[i].isPaused = self.myOverlay.channels[i].isPaused
+                                self.chanlist.channels[i].mode = self.myOverlay.channels[i].mode
+                                
+                                # set resume points
                                 # self.chanlist.channels[i].setShowPosition(xbmc.PlayList(xbmc.PLAYLIST_MUSIC).getposition())
-                            self.chanlist.channels[i].setShowPosition(self.chanlist.channels[i].playlistPosition)
+                                self.chanlist.channels[i].setShowPosition(self.chanlist.channels[i].playlistPosition)
                             self.chanlist.channels[i].setAccessTime(time.time())
                             
                             try:
