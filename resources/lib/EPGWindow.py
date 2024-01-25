@@ -248,23 +248,12 @@ class EPGWindow(xbmcgui.WindowXMLDialog):
         starttime = self.roundToHalfHour(int(starttime))
         self.setTimeLabels(starttime)
         self.shownTime = starttime
-        
         basex, basey = self.getControl(111).getPosition()
         basew = self.getControl(111).getWidth()
         tmpx, tmpy =  self.getControl(110 + self.rowCount).getPosition()
-
         timex, timey = self.getControl(120).getPosition()
         timew = self.getControl(120).getWidth()
         timeh = self.getControl(120).getHeight()
-        
-        timetx, timety = self.currentTime.getPosition()
-        timetw = self.currentTime.getWidth()
-        timeth = self.currentTime.getHeight()
-        timex, timey = self.getControl(120).getPosition()
-        timew = self.getControl(120).getWidth()
-        timeh = self.getControl(120).getHeight()
-        self.log('setChannelButtons, settime')
-        
         basecur = curchannel
         self.toRemove.append(self.currentTimeBar)
         EpgLogo = ADDON.getSetting('ShowEpgLogo')
@@ -346,8 +335,6 @@ class EPGWindow(xbmcgui.WindowXMLDialog):
             basex, basey = self.getControl(111 + row).getPosition()
             baseh = self.getControl(111 + row).getHeight()
             basew = self.getControl(111 + row).getWidth()
-            chtype = self.MyOverlayWindow.getChtype(curchannel)      
-            chname = self.MyOverlayWindow.getChname(curchannel)  
 
             if xbmc.Player().isPlaying() == False:
                 self.log('No video is playing, not adding buttons')
@@ -838,8 +825,6 @@ class EPGWindow(xbmcgui.WindowXMLDialog):
                 newchan = self.MyOverlayWindow.fixChannel(newchan - 1, False)
                 chnoffset += 1
         
-        chtype = self.MyOverlayWindow.getChtype(newchan)
-        chname = self.MyOverlayWindow.getChname(newchan)
         plpos = self.determinePlaylistPosAtTime(starttime, newchan)
 
         if plpos == -1:
